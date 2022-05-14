@@ -3,8 +3,8 @@ import traceback
 import os
 import time
 from abc import abstractmethod
-from .tools.blenderhelper import get_children_recursive
-from .sollumz_properties import BOUND_TYPES
+from .tools.blenderhelper import get_children_recursive, walk_children
+from .sollumz_properties import BOUND_TYPES, SollumType
 from .ydr.ydrexport import get_used_materials
 
 
@@ -67,6 +67,11 @@ def reset_sollumz_view(scene):
     scene.hide_medium_lods = not scene.hide_medium_lods
     scene.hide_low_lods = not scene.hide_low_lods
     scene.hide_very_low_lods = not scene.hide_very_low_lods
+
+
+def get_children_with_sollum_type(obj: bpy.types.Object, sollum_types: list[SollumType]) -> list[bpy.types.Object]:
+    """Get all children of the specified SollumType (recursive)."""
+    return [child for child in walk_children(obj) if child.sollum_type in sollum_types]
 
 
 def get_sollumz_objects_from_objects(objs, sollum_type):
