@@ -13,7 +13,7 @@ from ..tools.boundhelper import (
 from ..tools.meshhelper import create_box_from_extents, get_bound_center
 from ..sollumz_properties import BOUND_SHAPE_TYPES, SollumType, SOLLUMZ_UI_NAMES, BOUND_TYPES
 from ..sollumz_helper import SOLLUMZ_OT_base
-from ..tools.blenderhelper import get_selected_vertices, get_children_recursive, create_mesh_object
+from ..tools.blenderhelper import get_selected_vertices, get_children_recursive, create_sollumz_mesh_object
 import bpy
 import bmesh
 from mathutils import Vector
@@ -57,7 +57,7 @@ class SOLLUMZ_OT_create_polygon_bound(SOLLUMZ_OT_base, bpy.types.Operator):
 
         if sollum_type != SollumType.BOUND_POLY_TRIANGLE:
             pobj = create_bound_shape(
-                sollum_type) if sollum_type != SollumType.BOUND_POLY_BOX else create_mesh_object(sollum_type)
+                sollum_type) if sollum_type != SollumType.BOUND_POLY_BOX else create_sollumz_mesh_object(sollum_type)
 
             obb, world_matrix = get_obb(verts)
             bbmin, bbmax = get_obb_extents(obb)
@@ -94,7 +94,7 @@ class SOLLUMZ_OT_create_polygon_bound(SOLLUMZ_OT_base, bpy.types.Operator):
                 nfverts = [onm[v.index] for v in f.verts]
                 new_mesh.faces.new(nfverts)
 
-            pobj = create_mesh_object(sollum_type)
+            pobj = create_sollumz_mesh_object(sollum_type)
             pobj.location = obj.location
             new_mesh.to_mesh(pobj.data)
             bm.free()
