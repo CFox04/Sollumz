@@ -2,12 +2,12 @@ import bpy
 
 from ..sollumz_properties import SollumType, SOLLUMZ_UI_NAMES, BOUND_POLYGON_TYPES
 from ..tools.meshhelper import create_box
-from .blenderhelper import create_mesh_object
+from .blenderhelper import create_sollumz_mesh_object
 from mathutils import Vector
 
 
 def create_bound_shape(sollum_type):
-    pobj = create_mesh_object(sollum_type)
+    pobj = create_sollumz_mesh_object(sollum_type)
 
     # Constrain scale for bound polys
     if pobj.sollum_type in BOUND_POLYGON_TYPES and sollum_type != SollumType.BOUND_POLY_BOX and sollum_type != SollumType.BOUND_POLY_TRIANGLE:
@@ -98,7 +98,7 @@ def convert_selected_to_bound(selected, use_name, multiple, bvhs, replace_origin
         if obj.type == "MESH":
             name = obj.name
             sollum_type = SollumType.BOUND_POLY_TRIANGLE
-            poly_mesh = obj if replace_original else create_mesh_object(
+            poly_mesh = obj if replace_original else create_sollumz_mesh_object(
                 sollum_type)
 
             poly_mesh.parent = gobj
