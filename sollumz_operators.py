@@ -13,7 +13,7 @@ from .cwxml.navmesh import YNV
 from .cwxml.clipsdictionary import YCD
 from .cwxml.ytyp import YTYP
 from .cwxml.ymap import YMAP, EntityItem, CMapData
-from .ydr.ydrimport import import_ydr
+from .ydr.import_cwxml.drawable import DrawableCWXMLConverter
 from .ydr.ydrexport import export_ydr
 from .ydd.yddimport import import_ydd
 from .ydd.yddexport import export_ydd
@@ -62,7 +62,7 @@ class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
         try:
             valid_type = False
             if ext == YDR.file_extension:
-                import_ydr(filepath, self.import_settings)
+                DrawableCWXMLConverter.bpy_from_xml_file(filepath, self)
                 valid_type = True
             elif ext == YDD.file_extension:
                 import_ydd(self, filepath, self.import_settings)
