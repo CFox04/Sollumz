@@ -532,9 +532,10 @@ class DrawableModelListProperty(ListProperty):
 class Drawable(ElementTree, AbstractClass):
     tag_name = "Drawable"
 
-    @ property
-    def all_models(self):
-        return self.drawable_models_high + self.drawable_models_med + self.drawable_models_low + self.drawable_models_vlow
+    @property
+    def drawable_model_groups(self) -> list[list[DrawableModelItem]]:
+        """Drawable Model groups in order of lod level."""
+        return [self.drawable_models_high, self.drawable_models_low, self.drawable_models_med, self.drawable_models_vlow]
 
     def __init__(self):
         super().__init__()
@@ -556,7 +557,6 @@ class Drawable(ElementTree, AbstractClass):
         self.shader_group = ShaderGroupProperty()
         self.skeleton = SkeletonProperty()
         self.joints = JointsProperty()
-        # is embedded collision always type of composite? have to check
         self.drawable_models_high = DrawableModelListProperty(
             "DrawableModelsHigh")
         self.drawable_models_med = DrawableModelListProperty(
