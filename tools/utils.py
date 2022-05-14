@@ -1,7 +1,17 @@
-from mathutils import Vector
+import os
 import numpy
 from math import sqrt
 from mathutils import Vector, Quaternion
+
+
+def get_file_name(path: str) -> str:
+    """Get file name without extension"""
+    filename = os.path.splitext(os.path.basename(path))[0]
+
+    if os.path.splitext(filename)[1] != "":
+        return get_file_name(filename)
+
+    return filename
 
 
 def get_list_item(list, index):

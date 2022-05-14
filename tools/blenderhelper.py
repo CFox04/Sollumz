@@ -1,3 +1,4 @@
+from typing import Union, Callable
 import bpy
 from mathutils import Vector
 
@@ -7,6 +8,42 @@ from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
 def remove_number_suffix(string: str):
     """Remove the .00# at that Blender puts at the end of object names."""
     return string.split(".")[0]
+
+
+def find_first_child(obj: bpy.types.Object, condition_cb: Callable[[bpy.types.Object], bool], recursive=False):
+    """
+    Returns the first child of an object that meets a condition defined in the
+    conditon callback. Returns None if condition is never met.
+    :param condition_cb: A function handle of the form
+        ``callback(child_object)``, where ``child_object`` is the
+        current child.
+    """
+    child: bpy.types.Object
+    children = obj.children if not recursive else walk_children(obj)
+    for child in children:
+        if condition_cb(child):
+            return child
+
+    return None
+
+
+def walk_children(obj: bpy.types.Object):
+    """Returns a generator of the object children tree."""
+    yield obj
+    for child in obj.children:
+        yield from walk_children(child)
+
+
+def get_parent_bone(obj: bpy.types.Object) -> Union[bpy.types.Bone, None]:
+    """Get parent bone data-block of an object. Returns None if there is no parent bone."""
+    if obj.parent_type == "BONE":
+        parent_bone = obj.parent_bone
+        if parent_bone is None:
+            return
+
+        bone = obj.parent.data.bones.get(parent_bone)
+
+        return bone
 
 
 def create_brush(name):
@@ -247,12 +284,43 @@ def get_children_recursive(obj):
     return children
 
 
-def create_mesh_object(sollum_type: SollumType, name: str = None) -> bpy.types.Object:
-    """Create a bpy mesh object of the given sollum type and link it to the scene."""
-    name = name or SOLLUMZ_UI_NAMES[sollum_type]
-    mesh = bpy.data.meshes.new(name)
-    obj = bpy.data.objects.new(name, mesh)
+def create_sollumz_object(
+    sollum_type: SollumType, object_data: bpy.types.ID = None, do_link: bool = True, name: str = None
+):
+    """
+    Create a bpy object of the given sollum type
+    :param sollum_type: The sollum_type of the object
+    :param object_data: The object_data to be assigned to the object (i.e. a mesh).
+    Use None for empty objects
+    :param name: The name of the object.
+    :param do_link: Whether or not to link the object to the scene
+    """
+    obj: bpy.types.Object = bpy.data.objects.new(
+        name or SOLLUMZ_UI_NAMES[sollum_type], object_data)
+
+    if object_data is None:
+        obj.empty_display_size = 0
+
+    if do_link:
+        bpy.context.collection.objects.link(obj)
+
     obj.sollum_type = sollum_type
-    bpy.context.collection.objects.link(obj)
+
+    return obj
+
+
+def create_sollumz_mesh_object(
+    sollum_type: SollumType, do_link: bool = True, name: str = None
+):
+    """
+    Create a bpy mesh object of the given sollum type
+    :param sollum_type: The sollum_type of the object
+    :param do_link: Whether or not to link the object to the scene
+    """
+    name = name or SOLLUMZ_UI_NAMES[sollum_type]
+
+    mesh = bpy.data.meshes.new(name)
+    obj = create_sollumz_object(sollum_type, mesh, do_link, name)
+    mesh.name = obj.name
 
     return obj
