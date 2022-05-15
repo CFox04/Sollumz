@@ -607,6 +607,9 @@ class Drawable(ElementTree, AbstractClass):
             element.append(bound.to_xml())
         return element
 
+    def has_skeleton(self):
+        return len(self.skeleton.bones) > 0
+
 
 class DrawableDictionary(MutableSequence, Element):
     tag_name = "DrawableDictionary"

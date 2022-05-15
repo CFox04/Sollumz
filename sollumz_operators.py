@@ -13,9 +13,9 @@ from .cwxml.navmesh import YNV
 from .cwxml.clipsdictionary import YCD
 from .cwxml.ytyp import YTYP
 from .cwxml.ymap import YMAP, EntityItem, CMapData
-from .ydr.ydrimport import import_ydr
+# from .ydr.ydrimport import import_ydr
 from .ydr.ydrexport import export_ydr
-from .ydd.yddimport import import_ydd
+# from .ydd.yddimport import import_ydd
 from .ydd.yddexport import export_ydd
 from .yft.yftimport import import_yft
 from .yft.yftexport import export_yft
@@ -28,6 +28,9 @@ from .tools.meshhelper import get_bound_extents
 from .tools.utils import subtract_from_vector, add_to_vector, get_min_vector, get_max_vector
 from .tools.blenderhelper import get_terrain_texture_brush
 from .tools.ytyphelper import ytyp_from_objects
+
+from .ydr.import_cwxml.drawable import DrawableCWXMLConverter
+from .ydd.import_cwxml.drawable_dictionary import DrawableDictionaryCWXMLConverter
 
 
 class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
@@ -62,10 +65,13 @@ class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
         try:
             valid_type = False
             if ext == YDR.file_extension:
-                import_ydr(filepath, self.import_settings)
+                DrawableCWXMLConverter.bpy_from_xml_file(filepath, self)
+                # import_ydr(filepath, self.import_settings)
                 valid_type = True
             elif ext == YDD.file_extension:
-                import_ydd(self, filepath, self.import_settings)
+                # import_ydd(self, filepath, self.import_settings)
+                DrawableDictionaryCWXMLConverter.bpy_from_xml_file(
+                    filepath, self)
                 valid_type = True
             elif ext == YFT.file_extension:
                 import_yft(filepath, self.import_settings)

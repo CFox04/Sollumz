@@ -1,5 +1,6 @@
-from mathutils import Vector
+import os
 import numpy
+from mathutils import Vector
 from math import sqrt
 from mathutils import Vector, Quaternion
 
@@ -182,3 +183,13 @@ def prop_array_to_vector(prop, size=3):
     if size == 4:
         return Quaternion((prop[0], prop[1], prop[2], prop[3]))
     return Vector((prop[0], prop[1], prop[2]))
+
+
+def get_file_name(path: str) -> str:
+    """Get file name without extension"""
+    filename = os.path.splitext(os.path.basename(path))[0]
+
+    if os.path.splitext(filename)[1] != "":
+        return get_file_name(filename)
+
+    return filename
