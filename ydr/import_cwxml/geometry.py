@@ -18,11 +18,8 @@ class VertexComponents(NamedTuple):
     vertex_groups: dict[int, list[tuple[float, float]]]
 
 
-class GeometryCWXMLConverter(CWXMLConverter):
+class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
     """Converts geometry inside drawables to bpy objects."""
-    XML_TYPE = GeometryItem
-    SOLLUM_TYPE = SollumType.DRAWABLE_GEOMETRY
-
     @property
     def vertex_components(self) -> VertexComponents:
         """Access vertex data as separate data structures."""
@@ -38,12 +35,12 @@ class GeometryCWXMLConverter(CWXMLConverter):
         self._vertex_components = new_vertex_components
 
     def __init__(self, cwxml: GeometryItem):
-        self.cwxml: GeometryItem
         super().__init__(cwxml)
         self._vertex_components = None
 
     def create_bpy_object(self, name: str, bones: list[BoneItem], materials: list[bpy.types.Material]) -> bpy.types.Object:
-        geometry_object = create_sollumz_mesh_object(self.SOLLUM_TYPE)
+        geometry_object = create_sollumz_mesh_object(
+            SollumType.DRAWABLE_GEOMETRY)
         geometry_object.name = name
         self.bpy_object = geometry_object
 

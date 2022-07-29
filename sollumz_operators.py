@@ -6,7 +6,7 @@ from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector
 from .sollumz_helper import SOLLUMZ_OT_base
 from .sollumz_properties import SollumType, SOLLUMZ_UI_NAMES, BOUND_TYPES, SollumzExportSettings, SollumzImportSettings, TimeFlags
-from .cwxml.drawable import YDR, YDD
+from .cwxml.drawable import YDR, YDD, Drawable
 from .cwxml.fragment import YFT
 from .cwxml.bound import YBN
 from .cwxml.navmesh import YNV

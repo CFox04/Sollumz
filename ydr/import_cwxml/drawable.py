@@ -10,10 +10,9 @@ from .light import LightCWXMLConverter
 from .shader import ShaderCWXMLConverter
 
 
-class DrawableCWXMLConverter(CWXMLConverter):
+class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
     """Converts Drawable CWXML objects to bpy objects."""
-    XML_TYPE = ydrxml.Drawable
-    SOLLUM_TYPE = SollumType.DRAWABLE
+    IMPORT_CWXML_TYPE = ydrxml.Drawable
 
     @property
     def bones_cwxml(self) -> list[ydrxml.BoneItem]:
@@ -24,7 +23,6 @@ class DrawableCWXMLConverter(CWXMLConverter):
         return self._bones_cwxml
 
     def __init__(self, cwxml: ydrxml.Drawable, external_bones: list[ydrxml.BoneItem] = None):
-        self.cwxml: ydrxml.Drawable
         super().__init__(cwxml)
         self.materials: list[bpy.types.Material] = []
         self._bones_cwxml: list[ydrxml.BoneItem] = external_bones or []
@@ -37,7 +35,7 @@ class DrawableCWXMLConverter(CWXMLConverter):
             self.bpy_object = skeleton_converter.create_bpy_object(
                 name, self.cwxml.joints.rotation_limits)
         else:
-            self.bpy_object = create_sollumz_object(self.SOLLUM_TYPE)
+            self.bpy_object = create_sollumz_object(SollumType.DRAWABLE)
 
         self.bpy_object.name = name
         self.set_drawable_lod_dist()

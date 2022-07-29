@@ -10,17 +10,13 @@ from .. import shader_materials as shader_nodes
 from ...tools.utils import get_file_name
 
 
-class ShaderCWXMLConverter(CWXMLConverter):
+class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
     """Coverts CWXML shaders into bpy materials."""
-    XML_TYPE = ydrxml.ShaderItem
-    SOLLUM_TYPE = MaterialType.SHADER
-    BPY_TYPE = bpy.types.Material
 
     def __init__(
         self, cwxml: ydrxml.ShaderItem, filepath: str,
         texture_dictionary: list[ydrxml.TextureItem]
     ):
-        self.cwxml: ydrxml.ShaderItem
         self.bpy_object: bpy.types.Material
 
         super().__init__(cwxml)

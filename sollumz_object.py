@@ -1,12 +1,11 @@
 """Abstract classes for cwxml-bpy converters."""
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union, Type, Generic, TypeVar
 
 # Get type hinting for import/export ops without circular import
 if TYPE_CHECKING:
     from .sollumz_operators import SOLLUMZ_OT_import, SOLLUMZ_OT_export
 
 from abc import ABC as AbstractClass, abstractmethod
-from typing import Union, Type
 from enum import Enum
 
 from .cwxml.element import Element
@@ -15,79 +14,26 @@ from .tools.utils import get_file_name
 
 import bpy
 
+CwxmlType = TypeVar('CwxmlType', bound=Element)
 
-class SollumzObject(AbstractClass):
+
+class SollumzObject(AbstractClass, Generic[CwxmlType]):
     """Generic class for all Sollumz objects. Handles conversion between cwxml and bpy objects."""
-    BPY_TYPE = bpy.types.Object
 
-    @property
-    @abstractmethod
-    def XML_TYPE(self) -> Type[Element]:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def SOLLUM_TYPE(self) -> Union[SollumType, Enum]:
-        raise NotImplementedError
-
-    @property
-    def cwxml(self) -> XML_TYPE:
-        if self._cwxml is None:
-            raise AttributeError(f"{self} has no cwxml object!")
-        return self._cwxml
-
-    @cwxml.setter
-    def cwxml(self, new_cwxml):
-        if not isinstance(new_cwxml, self.XML_TYPE):
-            raise TypeError(
-                f"Invalid cwxml type '{new_cwxml.__class__.__name__}', expected type '{self.XML_TYPE.__name__}'")
-
-        self._cwxml = new_cwxml
-
-    @property
-    def bpy_object(self) -> bpy.types.Object:
-        if self._bpy_object is None:
-            raise AttributeError(f"{self} has no bpy object!")
-
-        return self._bpy_object
-
-    @bpy_object.setter
-    def bpy_object(self, new_bpy_object):
-        if not isinstance(new_bpy_object, self.BPY_TYPE):
-            raise TypeError(
-                f"{new_bpy_object} is not an instance of bpy.types.{self.BPY_TYPE.__name__}!")
-
-        self._bpy_object = new_bpy_object
-
-    def __init__(self, cwxml: Element = None, bpy_object: bpy.types.Object = None):
+    def __init__(self, cwxml: Union[CwxmlType, None] = None, bpy_object: Union[bpy.types.Object, None] = None):
         super().__init__()
-        if cwxml is not None:
-            self.cwxml = cwxml
-        else:
-            self._cwxml = None
-        if bpy_object is not None:
-            self.bpy_object = bpy_object
-        else:
-            self._bpy_object = None
-
+        self.cwxml = cwxml
+        self.bpy_object = bpy_object
         self.filepath: str = ""
 
 
-class CWXMLConverter(SollumzObject):
-    """Handles converting cwxml to bpy objects."""
-    XML_TYPE: Type[Element]
+class CWXMLConverter(SollumzObject[CwxmlType], AbstractClass):
+    """Handles converting cwxml objects to bpy objects."""
 
-    _import_operator: Union[bpy.types.Operator, None] = None
+    IMPORT_CWXML_TYPE: Type[Element]
+    import_operator: Union[bpy.types.Operator, None]
 
-    @property
-    def import_operator(self) -> bpy.types.Operator:
-        return CWXMLConverter._import_operator
-
-    @import_operator.setter
-    def import_operator(self, new_operator):
-        CWXMLConverter._import_operator = new_operator
-
-    def __init__(self, cwxml: Element):
+    def __init__(self, cwxml: CwxmlType):
         super().__init__(cwxml=cwxml)
 
     @classmethod
@@ -97,9 +43,11 @@ class CWXMLConverter(SollumzObject):
         import_operator: "SOLLUMZ_OT_import"
     ):
         """Create a bpy object from an xml file."""
-        CWXMLConverter._import_operator = import_operator
-
-        cwxml = cls.XML_TYPE.from_xml_file(filepath)
+        if not hasattr(cls, "IMPORT_CWXML_TYPE"):
+            raise AttributeError(
+                f'IMPORT_CWXML_TYPE must be defined in converter {cls.__name__} in order to load a xml file!')
+        CWXMLConverter.import_operator = import_operator
+        cwxml = cls.IMPORT_CWXML_TYPE.from_xml_file(filepath)
         converter = cls(cwxml)
         converter.filepath = filepath
 
@@ -113,17 +61,8 @@ class CWXMLConverter(SollumzObject):
 
 class BPYConverter(SollumzObject):
     """Handles converting bpy objects to cwxml."""
-    SOLLUM_TYPE: Union[SollumType, Enum]
 
-    _export_operator: Union[bpy.types.Operator, None] = None
-
-    @property
-    def export_operator(self) -> bpy.types.Operator:
-        return BPYConverter._export_operator
-
-    @export_operator.setter
-    def export_operator(self, new_operator):
-        BPYConverter._export_operator = new_operator
+    export_operator: Union[bpy.types.Operator, None] = None
 
     def __init__(self, bpy_object: bpy.types.Object):
         super().__init__(bpy_object=bpy_object)
@@ -134,7 +73,7 @@ class BPYConverter(SollumzObject):
         export_operator: "SOLLUMZ_OT_export"
     ):
         """Write a bpy object as a cwxml file to filepath."""
-        BPYConverter._export_operator = export_operator
+        BPYConverter.export_operator = export_operator
 
         converter = cls(bpy_object)
         converter.filepath = filepath

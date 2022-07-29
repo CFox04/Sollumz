@@ -9,19 +9,17 @@ from ...sollumz_helper import find_fragment_file
 from ...ydr.import_cwxml.drawable import DrawableCWXMLConverter
 
 
-class DrawableDictionaryCWXMLConverter(CWXMLConverter):
+class DrawableDictionaryCWXMLConverter(CWXMLConverter[ydrxml.DrawableDictionary]):
     """Converts Drawable Dictionary CWXML objects to bpy objects."""
-    XML_TYPE = ydrxml.DrawableDictionary
-    SOLLUM_TYPE = SollumType.DRAWABLE_DICTIONARY
 
-    def __init__(self, cwxml: ydrxml.DrawableDictionary):
-        self.cwxml: ydrxml.DrawableDictionary
+    def __init__(self, cwxml):
         super().__init__(cwxml)
         self.skeleton: ydrxml.SkeletonProperty = ydrxml.SkeletonProperty()
         self.armature: bpy.types.Object = None
 
     def create_bpy_object(self, name: str) -> bpy.types.Object:
-        self.bpy_object = create_sollumz_object(self.SOLLUM_TYPE)
+        self.bpy_object = create_sollumz_object(SollumType.DRAWABLE_DICTIONARY)
+        print(DrawableCWXMLConverter.cwxml)
         self.bpy_object.name = name
 
         if self.import_operator.import_settings.import_ext_skeleton:
@@ -31,7 +29,7 @@ class DrawableDictionaryCWXMLConverter(CWXMLConverter):
 
         self.create_drawables()
 
-        if self.armature:
+        if self.armature is not None:
             self.set_armature_modifiers()
 
     def load_external_skeleton(self):

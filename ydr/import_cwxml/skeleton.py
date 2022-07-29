@@ -7,18 +7,12 @@ from ...sollumz_properties import SollumType
 from ...tools.blenderhelper import create_sollumz_object
 
 
-class SkeletonCWXMLConverter(CWXMLConverter):
-    XML_TYPE = ydrxml.SkeletonProperty
-    SOLLUM_TYPE = SollumType.SKELETON
-
-    def __init__(self, cwxml: ydrxml.SkeletonProperty):
-        self.cwxml: ydrxml.SkeletonProperty
-        super().__init__(cwxml)
+class SkeletonCWXMLConverter(CWXMLConverter[ydrxml.SkeletonProperty]):
 
     def create_bpy_object(self, name: str, rotation_limits: list[ydrxml.RotationLimitItem]) -> bpy.types.Object:
         armature_data = bpy.data.armatures.new(name + ".skel")
         armature_object = create_sollumz_object(
-            self.SOLLUM_TYPE, armature_data)
+            SollumType.SKELETON, armature_data)
         self.bpy_object = armature_object
 
         self.create_bones()
