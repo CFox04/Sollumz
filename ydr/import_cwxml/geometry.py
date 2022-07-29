@@ -37,9 +37,9 @@ class GeometryCWXMLConverter(CWXMLConverter):
     def vertex_components(self, new_vertex_components):
         self._vertex_components = new_vertex_components
 
-    def __init__(self, cwxml: GeometryItem, import_operator):
+    def __init__(self, cwxml: GeometryItem):
         self.cwxml: GeometryItem
-        super().__init__(cwxml, import_operator)
+        super().__init__(cwxml)
         self._vertex_components = None
 
     def create_bpy_object(self, name: str, bones: list[BoneItem], materials: list[bpy.types.Material]) -> bpy.types.Object:

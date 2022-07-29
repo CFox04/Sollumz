@@ -77,6 +77,19 @@ class CWXMLConverter(SollumzObject):
     """Handles converting cwxml to bpy objects."""
     XML_TYPE: Type[Element]
 
+    _import_operator: Union[bpy.types.Operator, None] = None
+
+    @property
+    def import_operator(self) -> bpy.types.Operator:
+        return CWXMLConverter._import_operator
+
+    @import_operator.setter
+    def import_operator(self, new_operator):
+        CWXMLConverter._import_operator = new_operator
+
+    def __init__(self, cwxml: Element):
+        super().__init__(cwxml=cwxml)
+
     @classmethod
     def bpy_from_xml_file(
         cls,
@@ -84,14 +97,13 @@ class CWXMLConverter(SollumzObject):
         import_operator: "SOLLUMZ_OT_import"
     ):
         """Create a bpy object from an xml file."""
-        cwxml = cls.XML_TYPE.from_xml_file(filepath)
-        converter = cls(cwxml, import_operator)
-        converter.filepath = filepath
-        return converter.create_bpy_object(name=get_file_name(filepath))
+        CWXMLConverter._import_operator = import_operator
 
-    def __init__(self, cwxml: Element, import_operator: "SOLLUMZ_OT_import"):
-        super().__init__(cwxml=cwxml)
-        self.import_operator = import_operator
+        cwxml = cls.XML_TYPE.from_xml_file(filepath)
+        converter = cls(cwxml)
+        converter.filepath = filepath
+
+        return converter.create_bpy_object(name=get_file_name(filepath))
 
     @abstractmethod
     def create_bpy_object(self, name: str = None) -> bpy.types.Object:
@@ -103,20 +115,31 @@ class BPYConverter(SollumzObject):
     """Handles converting bpy objects to cwxml."""
     SOLLUM_TYPE: Union[SollumType, Enum]
 
+    _export_operator: Union[bpy.types.Operator, None] = None
+
+    @property
+    def export_operator(self) -> bpy.types.Operator:
+        return BPYConverter._export_operator
+
+    @export_operator.setter
+    def export_operator(self, new_operator):
+        BPYConverter._export_operator = new_operator
+
+    def __init__(self, bpy_object: bpy.types.Object):
+        super().__init__(bpy_object=bpy_object)
+
     @classmethod
     def bpy_to_xml_file(
         cls, filepath: str, bpy_object: bpy.types.Object,
         export_operator: "SOLLUMZ_OT_export"
     ):
         """Write a bpy object as a cwxml file to filepath."""
-        converter = cls(bpy_object, export_operator)
+        BPYConverter._export_operator = export_operator
+
+        converter = cls(bpy_object)
         converter.filepath = filepath
         cwxml = converter.create_cwxml()
         cwxml.write_xml(filepath)
-
-    def __init__(self, bpy_object: bpy.types.Object, export_operator: "SOLLUMZ_OT_export"):
-        super().__init__(bpy_object=bpy_object)
-        self.export_operator = export_operator
 
     @abstractmethod
     def create_cwxml(self) -> Element:

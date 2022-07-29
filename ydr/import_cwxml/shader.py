@@ -17,14 +17,13 @@ class ShaderCWXMLConverter(CWXMLConverter):
     BPY_TYPE = bpy.types.Material
 
     def __init__(
-        self, cwxml: ydrxml.ShaderItem,
-        import_operator, filepath: str,
+        self, cwxml: ydrxml.ShaderItem, filepath: str,
         texture_dictionary: list[ydrxml.TextureItem]
     ):
         self.cwxml: ydrxml.ShaderItem
         self.bpy_object: bpy.types.Material
 
-        super().__init__(cwxml, import_operator)
+        super().__init__(cwxml)
 
         self.filepath = filepath
         self.texture_dictionary = texture_dictionary

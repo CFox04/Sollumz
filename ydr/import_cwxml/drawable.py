@@ -1,5 +1,3 @@
-from operator import index
-import traceback
 import bpy
 
 from ...sollumz_object import CWXMLConverter
@@ -25,16 +23,16 @@ class DrawableCWXMLConverter(CWXMLConverter):
 
         return self._bones_cwxml
 
-    def __init__(self, cwxml: ydrxml.Drawable, import_operator, external_bones: list[ydrxml.BoneItem] = None):
+    def __init__(self, cwxml: ydrxml.Drawable, external_bones: list[ydrxml.BoneItem] = None):
         self.cwxml: ydrxml.Drawable
-        super().__init__(cwxml, import_operator)
+        super().__init__(cwxml)
         self.materials: list[bpy.types.Material] = []
         self._bones_cwxml: list[ydrxml.BoneItem] = external_bones or []
 
     def create_bpy_object(self, name: str) -> bpy.types.Object:
         if self.cwxml.has_skeleton():
             skeleton_converter = SkeletonCWXMLConverter(
-                cwxml=self.cwxml.skeleton, import_operator=self.import_operator)
+                cwxml=self.cwxml.skeleton)
 
             self.bpy_object = skeleton_converter.create_bpy_object(
                 name, self.cwxml.joints.rotation_limits)
@@ -46,12 +44,12 @@ class DrawableCWXMLConverter(CWXMLConverter):
         self.create_all_drawable_models()
 
         for bound in self.cwxml.bounds:
-            # BoundCWXMLConverter(cwxml=bound, import_operator=self.import_operator).create_bpy_object()
+            # BoundCWXMLConverter(cwxml=bound).create_bpy_object()
             pass
 
         for light in self.cwxml.lights:
             LightCWXMLConverter(
-                light, self.import_operator).create_bpy_object()
+                light).create_bpy_object()
 
         if self.import_operator.import_settings.join_geometries:
             self.join_geometries()
@@ -82,7 +80,7 @@ class DrawableCWXMLConverter(CWXMLConverter):
         """Create all materials from this drawable's cwxml shader group."""
         for shader_cwxml in self.cwxml.shader_group.shaders:
             material = ShaderCWXMLConverter(
-                shader_cwxml, self.import_operator, self.filepath, self.cwxml.shader_group.texture_dictionary).create_bpy_object()
+                shader_cwxml, self.filepath, self.cwxml.shader_group.texture_dictionary).create_bpy_object()
             self.materials.append(material)
 
     def create_drawable_model(self, model_cwxml: ydrxml.DrawableModelItem, lod_level: LODLevel):
@@ -111,7 +109,7 @@ class DrawableCWXMLConverter(CWXMLConverter):
     def create_drawable_model_geometry(self, geometry_cwxml: ydrxml.GeometryItem):
         """Create a geometry object for the given drawable model bpy object."""
         geometry_converter = GeometryCWXMLConverter(
-            geometry_cwxml, self.import_operator)
+            geometry_cwxml)
 
         geometry_converter.create_bpy_object(
             self.cwxml.name, self.bones_cwxml, self.materials)
@@ -124,7 +122,7 @@ class DrawableCWXMLConverter(CWXMLConverter):
     def create_geometries_split_by_bone(self, geometry_cwxml: ydrxml.GeometryItem):
         """Create a geometry object for the given drawable model bpy object."""
         geometry_converter = GeometryCWXMLConverter(
-            geometry_cwxml, self.import_operator)
+            geometry_cwxml)
 
         vertex_bone_map, index_bone_map = geometry_converter.get_vertices_indices_split_by_bone()
 

@@ -11,9 +11,9 @@ class SkeletonCWXMLConverter(CWXMLConverter):
     XML_TYPE = ydrxml.SkeletonProperty
     SOLLUM_TYPE = SollumType.SKELETON
 
-    def __init__(self, cwxml: ydrxml.SkeletonProperty, import_operator):
+    def __init__(self, cwxml: ydrxml.SkeletonProperty):
         self.cwxml: ydrxml.SkeletonProperty
-        super().__init__(cwxml, import_operator)
+        super().__init__(cwxml)
 
     def create_bpy_object(self, name: str, rotation_limits: list[ydrxml.RotationLimitItem]) -> bpy.types.Object:
         armature_data = bpy.data.armatures.new(name + ".skel")

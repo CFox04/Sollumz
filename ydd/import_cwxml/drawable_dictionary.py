@@ -14,9 +14,9 @@ class DrawableDictionaryCWXMLConverter(CWXMLConverter):
     XML_TYPE = ydrxml.DrawableDictionary
     SOLLUM_TYPE = SollumType.DRAWABLE_DICTIONARY
 
-    def __init__(self, cwxml: ydrxml.DrawableDictionary, import_operator):
+    def __init__(self, cwxml: ydrxml.DrawableDictionary):
         self.cwxml: ydrxml.DrawableDictionary
-        super().__init__(cwxml, import_operator)
+        super().__init__(cwxml)
         self.skeleton: ydrxml.SkeletonProperty = ydrxml.SkeletonProperty()
         self.armature: bpy.types.Object = None
 
@@ -70,7 +70,7 @@ class DrawableDictionaryCWXMLConverter(CWXMLConverter):
         drawable: ydrxml.Drawable
         for drawable in self.cwxml:
             drawable_obj = DrawableCWXMLConverter(
-                drawable, self.import_operator, self.skeleton.bones).create_bpy_object(drawable.name)
+                drawable, self.skeleton.bones).create_bpy_object(drawable.name)
 
             if drawable.skeleton == self.skeleton:
                 self.armature = drawable_obj
