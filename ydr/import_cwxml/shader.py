@@ -159,18 +159,6 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
             dtl_ext.image = dtl.image
 
     @staticmethod
-    def find_existing_image(texture_name: str) -> Union[bpy.types.Image, None]:
-        """Attempts to find existing image with texture_name in the blend file.
-        If found, the image will be returned, otherwise None will be returned."""
-        existing_texture = bpy.data.images.get(texture_name)
-
-        for image in bpy.data.images:
-            if image.name == texture_name:
-                existing_texture = image
-
-        return existing_texture
-
-    @staticmethod
     def create_blank_image(name: str) -> bpy.types.Image:
         """Create a blank 512x512 bpy image with the given name."""
         return bpy.data.images.new(name=name, width=512, height=512)
