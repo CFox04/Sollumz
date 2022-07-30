@@ -35,9 +35,9 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
             self.bpy_object = skeleton_converter.create_bpy_object(
                 name, self.cwxml.joints.rotation_limits)
         else:
-            self.bpy_object = create_sollumz_object(SollumType.DRAWABLE)
+            self.bpy_object = create_sollumz_object(
+                SollumType.DRAWABLE, name=name)
 
-        self.bpy_object.name = name
         self.set_drawable_lod_dist()
         self.create_all_drawable_models()
 

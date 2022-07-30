@@ -18,9 +18,8 @@ class DrawableDictionaryCWXMLConverter(CWXMLConverter[ydrxml.DrawableDictionary]
         self.armature: bpy.types.Object = None
 
     def create_bpy_object(self, name: str) -> bpy.types.Object:
-        self.bpy_object = create_sollumz_object(SollumType.DRAWABLE_DICTIONARY)
-        print(DrawableCWXMLConverter.cwxml)
-        self.bpy_object.name = name
+        self.bpy_object = create_sollumz_object(
+            SollumType.DRAWABLE_DICTIONARY, name=name)
 
         if self.import_operator.import_settings.import_ext_skeleton:
             self.load_external_skeleton()

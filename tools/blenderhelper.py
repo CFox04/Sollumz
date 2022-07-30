@@ -269,28 +269,8 @@ def split_object_by_bones(obj: bpy.types.Object, armature: bpy.types.Armature):
             bone_obj.parent = bpy.data.objects[bone_parent.name]
 
 
-def create_object(name: str, object_data: bpy.types.ID = None, do_link: bool = None):
-    """
-    Create a bpy object with the given object data
-
-    :param name: The name of the object to be created
-    :param object_data: The object_data to be assigned to the object (i.e. a mesh)
-    :param do_link: Whether or not to link the object to the scene
-    """
-    do_link = True if do_link is None else False
-    obj: bpy.types.Object = bpy.data.objects.new(name, object_data)
-
-    if object_data is None:
-        obj.empty_display_size = 0
-
-    if do_link:
-        bpy.context.collection.objects.link(obj)
-
-    return obj
-
-
 def create_sollumz_object(
-    sollum_type: SollumType, object_data: bpy.types.ID = None, do_link: bool = None
+    sollum_type: SollumType, object_data: bpy.types.ID = None, do_link: bool = True, name: str = None
 ):
     """
     Create a bpy object of the given sollum type
@@ -298,19 +278,25 @@ def create_sollumz_object(
     :param sollum_type: The sollum_type of the object
     :param object_data: The object_data to be assigned to the object (i.e. a mesh).
     Use None for empty objects
+    :param name: The name of the object.
     :param do_link: Whether or not to link the object to the scene
     """
-    name = SOLLUMZ_UI_NAMES[SollumType.NONE]
-    if sollum_type in SOLLUMZ_UI_NAMES:
-        name = SOLLUMZ_UI_NAMES[sollum_type]
-    obj = create_object(name, object_data, do_link)
+    obj: bpy.types.Object = bpy.data.objects.new(
+        name or SOLLUMZ_UI_NAMES[sollum_type], object_data)
+
+    if object_data is None:
+        obj.empty_display_size = 0
+
+    if do_link:
+        bpy.context.collection.objects.link(obj)
+
     obj.sollum_type = sollum_type
 
     return obj
 
 
 def create_sollumz_mesh_object(
-    sollum_type: SollumType, do_link: bool = None
+    sollum_type: SollumType, do_link: bool = True, name: str = None
 ):
     """
     Create a bpy mesh object of the given sollum type
@@ -318,8 +304,10 @@ def create_sollumz_mesh_object(
     :param sollum_type: The sollum_type of the object
     :param do_link: Whether or not to link the object to the scene
     """
-    mesh = bpy.data.meshes.new("")
-    obj = create_sollumz_object(sollum_type, mesh, do_link)
+    name = name or SOLLUMZ_UI_NAMES[sollum_type]
+
+    mesh = bpy.data.meshes.new(name)
+    obj = create_sollumz_object(sollum_type, mesh, do_link, name)
     mesh.name = obj.name
 
     return obj

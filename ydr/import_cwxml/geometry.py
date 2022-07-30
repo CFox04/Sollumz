@@ -40,8 +40,7 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
 
     def create_bpy_object(self, name: str, bones: list[BoneItem], materials: list[bpy.types.Material]) -> bpy.types.Object:
         geometry_object = create_sollumz_mesh_object(
-            SollumType.DRAWABLE_GEOMETRY)
-        geometry_object.name = name
+            SollumType.DRAWABLE_GEOMETRY, name=name)
         self.bpy_object = geometry_object
 
         # Split indices into groups of 3
