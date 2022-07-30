@@ -146,7 +146,7 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
                 node.texture_properties.extra_flags = texture.extra_flags
                 ShaderCWXMLConverter.set_texture_usage_flags(node, texture)
 
-        if not node.texture_properties.embedded:
+        if node.image is not None and not node.texture_properties.embedded:
             # Set external texture name for non-embedded textures
             node.image.source = "FILE"
             node.image.filepath = "//" + node.image.name + ".dds"

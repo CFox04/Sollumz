@@ -243,32 +243,6 @@ def get_children_recursive(obj) -> list[bpy.types.Object]:
     return children
 
 
-def split_object_by_bones(obj: bpy.types.Object, armature: bpy.types.Armature):
-    bpy.context.view_layer.objects.active = obj
-
-    bpy.ops.object.mode_set(mode="EDIT")
-    for vertex_group in obj.vertex_groups:
-        obj.vertex_groups.active = vertex_group
-        bpy.ops.object.vertex_group_select()
-        bpy.ops.mesh.duplicate()
-        bpy.ops.mesh.separate(type="SELECTED")
-
-        selected_objs = bpy.context.selected_objects
-        new_obj = selected_objs[len(selected_objs) - 1]
-        new_obj.name = vertex_group.name
-
-    bpy.ops.object.mode_set(mode="OBJECT")
-    bpy.data.objects.remove(obj)
-
-    for bone in armature.bones:
-        if not bone.name in bpy.data.objects:
-            continue
-        bone_obj = bpy.data.objects[bone.name]
-        bone_parent = bone.parent
-        if bone_parent is not None and bone_parent.name in bpy.data.objects:
-            bone_obj.parent = bpy.data.objects[bone_parent.name]
-
-
 def create_sollumz_object(
     sollum_type: SollumType, object_data: bpy.types.ID = None, do_link: bool = True, name: str = None
 ):
