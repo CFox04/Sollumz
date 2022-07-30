@@ -34,6 +34,7 @@ class CWXMLConverter(SollumzObject[CwxmlType], AbstractClass):
     import_operator: Union[bpy.types.Operator, None]
 
     def __init__(self, cwxml: CwxmlType):
+        self.cwxml: CwxmlType
         super().__init__(cwxml=cwxml)
 
     @classmethod

@@ -25,23 +25,15 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
         self.texture_dictionary = texture_dictionary
 
     def create_bpy_object(self) -> bpy.types.Material:
-        filename = self.cwxml.filename
-
-        material = bpy.data.materials.new(self.cwxml.name)
-        self.bpy_object = material
+        self.bpy_object = bpy.data.materials.new(self.cwxml.name)
         self.set_material_properties()
+        self.create_shader_nodes()
 
-        if self.cwxml.filename in ShaderManager.terrains:
-            shader_nodes.create_terrain_shader(material, self.cwxml, filename)
-        else:
-            shader_nodes.create_basic_shader_nodes(
-                material, self.cwxml, filename)
-
-        shader_nodes.organize_node_tree(material.node_tree)
-
+        # TODO: Refactor shader_materials.py and include whats done in this loop. Everything
+        # related to nodes should be done in shader_materials.py
         param: ydrxml.ShaderParameter
         for param in self.cwxml.parameters:
-            for node in material.node_tree.nodes:
+            for node in self.bpy_object.node_tree.nodes:
                 if isinstance(node, bpy.types.ShaderNodeTexImage) and param.name == node.name:
                     self.load_image_texture(node, param)
                     self.set_embedded_texture_properties(node)
@@ -53,7 +45,7 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
 
         self.assign_extra_detail_node()
 
-        return material
+        return self.bpy_object
 
     def set_material_properties(self):
         """Set the properties of this shader to that of the cwxml shader."""
@@ -67,8 +59,25 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
         material.shader_properties.filename = shader.filename
         material.shader_properties.renderbucket = shader.render_bucket
 
+    def create_shader_nodes(self):
+        """Creates the shader nodes for this material."""
+        material = self.bpy_object
+        filename = self.cwxml.filename
+
+        if filename in ShaderManager.terrains:
+            shader_nodes.create_terrain_shader(material, self.cwxml, filename)
+        else:
+            shader_nodes.create_basic_shader_nodes(
+                material, self.cwxml, filename)
+
+        shader_nodes.organize_node_tree(material.node_tree)
+
     def load_image_texture(self, node: bpy.types.ShaderNodeTexImage, param: ydrxml.TextureShaderParameter):
         """Load image texture for node based on the cwxml texture shader parameter given."""
+        # For some reason texture parameters will sometimes have no name.
+        if not param.texture_name:
+            return
+
         image = bpy.data.images.get(param.texture_name)
 
         if image is None:
@@ -91,7 +100,7 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
         texture_folder = self.get_texture_folder()
 
         if not texture_folder:
-            return
+            return None
 
         texture_path = os.path.join(
             texture_folder, texture_name + ".dds")
