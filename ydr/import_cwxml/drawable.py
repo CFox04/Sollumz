@@ -105,7 +105,8 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
         model_object.drawable_model_properties.unknown_1 = model_cwxml.unknown_1
         model_object.drawable_model_properties.flags = model_cwxml.flags
 
-        if self.cwxml.has_skeleton() and self.import_operator.import_settings.split_by_bone:
+        import_settings = self.import_operator.import_settings
+        if not import_settings.join_geometries and import_settings.split_by_bone and model_cwxml.has_skin == 1:
             # TODO: This is old code. Still need to implement split by bone in rewrite.
             child_objs = geometry_to_obj_split_by_bone(
                 model_cwxml, self.materials, self.bones_cwxml)
