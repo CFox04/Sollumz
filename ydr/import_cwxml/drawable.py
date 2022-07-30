@@ -1,10 +1,11 @@
 import bpy
 
 from ...sollumz_object import CWXMLConverter
-from ...sollumz_properties import SollumType, LODLevel
+from ...sollumz_properties import SollumType, LODLevel, SOLLUMZ_UI_NAMES
 from ...tools.blenderhelper import create_sollumz_object, join_objects
 from ...cwxml import drawable as ydrxml
-from ..ydrimport import geometry_to_obj_split_by_bone
+from ...ybn.ybnimport import composite_to_obj, bound_to_obj
+from ..ydrimport import geometry_to_obj_split_by_bone, create_lights
 from ..shader_materials import create_tinted_shader_graph
 from .geometry import GeometryCWXMLConverter
 from .skeleton import SkeletonCWXMLConverter
@@ -42,14 +43,8 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
 
         self.set_drawable_lod_dist()
         self.create_all_drawable_models()
-
-        for bound in self.cwxml.bounds:
-            # BoundCWXMLConverter(cwxml=bound).create_bpy_object()
-            pass
-
-        for light in self.cwxml.lights:
-            LightCWXMLConverter(
-                light).create_bpy_object()
+        self.create_embedded_collisions()
+        self.create_lights()
 
         if self.import_operator.import_settings.join_geometries:
             self.join_geometries()
@@ -79,6 +74,27 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
             material = ShaderCWXMLConverter(
                 shader_cwxml, self.filepath, self.cwxml.shader_group.texture_dictionary).create_bpy_object()
             self.materials.append(material)
+
+    def create_embedded_collisions(self):
+        """Create all collisions defined in the drawable."""
+        # TODO: Old code. Ybn import still needs rewrite.
+        for bound in self.cwxml.bounds:
+            bobj = None
+            if bound.type == "Composite":
+                bobj = composite_to_obj(
+                    bound, SOLLUMZ_UI_NAMES[SollumType.BOUND_COMPOSITE], True)
+                bobj.parent = self.bpy_object
+            else:
+                bobj = bound_to_obj(bound)
+                if bobj:
+                    bobj.parent = self.bpy_object
+
+    def create_lights(self):
+        """Create all lights for this drawable."""
+        # TODO: Old code. Lights import needs rewrite.
+        lights_cwxml = self.cwxml.lights
+        if lights_cwxml:
+            create_lights(lights_cwxml, self.bpy_object)
 
     def create_drawable_model(self, model_cwxml: ydrxml.DrawableModelItem, lod_level: LODLevel):
         """Create a single drawable model given its cwxml."""
