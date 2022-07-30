@@ -13,6 +13,19 @@ from ...tools.utils import get_file_name
 class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
     """Coverts CWXML shaders into bpy materials."""
 
+    @property
+    def texture_folder(self):
+        """Texture folder path from the filepath of this shader group's drawable."""
+        if self._texture_folder is not None:
+            return self._texture_folder
+
+        file_name = get_file_name(self.filepath)
+        texture_folder = f"{os.path.dirname(self.filepath)}\\{file_name}"
+
+        if os.path.exists(texture_folder):
+            self._texture_folder = texture_folder
+            return texture_folder
+
     def __init__(
         self, cwxml: ydrxml.ShaderItem, filepath: str,
         texture_dictionary: list[ydrxml.TextureItem]
@@ -23,6 +36,7 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
 
         self.filepath = filepath
         self.texture_dictionary = texture_dictionary
+        self._texture_folder: Union[str, None] = None
 
     def create_bpy_object(self) -> bpy.types.Material:
         self.bpy_object = bpy.data.materials.new(self.cwxml.name)
@@ -36,7 +50,7 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
             for node in self.bpy_object.node_tree.nodes:
                 if isinstance(node, bpy.types.ShaderNodeTexImage) and param.name == node.name:
                     self.load_image_texture(node, param)
-                    self.set_embedded_texture_properties(node)
+                    self.set_embedded_texture_properties(node, param)
                 elif isinstance(node, bpy.types.ShaderNodeValue):
                     # Check if param name is equal to the node name without the _xyz suffix
                     if param.name == node.name[:-2]:
@@ -82,7 +96,6 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
 
         if image is None:
             image = self.load_image(param.texture_name)
-
         if image is None:
             image = ShaderCWXMLConverter.create_blank_image(param.texture_name)
 
@@ -97,13 +110,11 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
         """Attempt to load a .dds image with texture_name from this shader group's texture
         folder. If a .dds file is found a bpy image will be returned, otherwise None will be
         returned."""
-        texture_folder = self.get_texture_folder()
-
-        if not texture_folder:
+        if not self.texture_folder:
             return None
 
         texture_path = os.path.join(
-            texture_folder, texture_name + ".dds")
+            self.texture_folder, texture_name + ".dds")
 
         if os.path.isfile(texture_path):
             bpy_image = bpy.data.images.load(
@@ -113,31 +124,22 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
 
         return None
 
-    def get_texture_folder(self):
-        """Get texture folder path from the filepath of this shader group's drawable."""
-        file_name = get_file_name(self.filepath)
-        texture_folder = f"{os.path.dirname(self.filepath)}\\{file_name}"
-
-        if os.path.exists(texture_folder):
-            return texture_folder
-
-    def set_embedded_texture_properties(self, node: bpy.types.ShaderNodeTexImage):
+    def set_embedded_texture_properties(self, node: bpy.types.ShaderNodeTexImage, param: ydrxml.TextureShaderParameter):
         """Set embedded texture properties for node based on self.texture_dictionary."""
         for texture in self.texture_dictionary:
-            if texture.name == node.name:
+            if texture.name == param.texture_name:
                 node.texture_properties.embedded = True
-                try:
-                    format = TextureFormat[texture.format.replace(
-                        "D3DFMT_", "")]
-                    node.texture_properties.format = format
-                except AttributeError:
+
+                texture_format = texture.format.replace("D3DFMT_", "")
+                if hasattr(TextureFormat, texture_format):
+                    node.texture_properties.format = TextureFormat[texture_format]
+                else:
                     self.import_operator.report(
                         {"WARNING"}, f"Failed to set texture format for texture '{texture.name}': format '{texture.format}' unknown.")
 
-                try:
-                    usage = TextureUsage[texture.usage]
-                    node.texture_properties.usage = usage
-                except AttributeError:
+                if hasattr(TextureUsage, texture.usage):
+                    node.texture_properties.usage = TextureUsage[texture.usage]
+                else:
                     self.import_operator.report(
                         {"WARNING"}, f"Failed to set texture usage for texture '{texture.name}': usage '{texture.usage}' unknown.")
 
