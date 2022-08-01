@@ -16,7 +16,7 @@ from .shader import ShaderCWXMLConverter
 
 class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
     """Converts Drawable CWXML objects to bpy objects."""
-    IMPORT_CWXML_TYPE = ydrxml.Drawable
+    IMPORT_CWXML_FUNC = ydrxml.Drawable.from_xml_file
 
     @property
     def bones_cwxml(self) -> list[ydrxml.BoneItem]:

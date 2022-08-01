@@ -11,7 +11,7 @@ from ...ydr.import_cwxml.drawable import DrawableCWXMLConverter
 
 class DrawableDictionaryCWXMLConverter(CWXMLConverter[ydrxml.DrawableDictionary]):
     """Converts Drawable Dictionary CWXML objects to bpy objects."""
-    IMPORT_CWXML_TYPE = ydrxml.DrawableDictionary
+    IMPORT_CWXML_FUNC = ydrxml.DrawableDictionary.from_xml_file
 
     def __init__(self, cwxml):
         super().__init__(cwxml)

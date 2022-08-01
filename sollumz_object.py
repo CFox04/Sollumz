@@ -1,5 +1,6 @@
 """Abstract classes for cwxml-bpy converters."""
-from typing import TYPE_CHECKING, Union, Type, Generic, TypeVar
+from os import PathLike
+from typing import TYPE_CHECKING, Callable, Union, Type, Generic, TypeVar
 
 # Get type hinting for import/export ops without circular import
 if TYPE_CHECKING:
@@ -30,7 +31,7 @@ class SollumzObject(AbstractClass, Generic[CwxmlType]):
 class CWXMLConverter(SollumzObject[CwxmlType], AbstractClass):
     """Handles converting cwxml objects to bpy objects."""
 
-    IMPORT_CWXML_TYPE: Type[Element]
+    IMPORT_CWXML_FUNC: Callable[[PathLike], CwxmlType]
     import_operator: Union[bpy.types.Operator, None]
 
     def __init__(self, cwxml: CwxmlType):
@@ -44,11 +45,11 @@ class CWXMLConverter(SollumzObject[CwxmlType], AbstractClass):
         import_operator: "SOLLUMZ_OT_import"
     ):
         """Create a bpy object from an xml file."""
-        if not hasattr(cls, "IMPORT_CWXML_TYPE"):
+        if not hasattr(cls, "IMPORT_CWXML_FUNC"):
             raise AttributeError(
-                f'IMPORT_CWXML_TYPE must be defined in converter {cls.__name__} in order to load a xml file!')
+                f'IMPORT_CWXML_FUNC must be defined in converter {cls.__name__} in order to load a xml file!')
         CWXMLConverter.import_operator = import_operator
-        cwxml = cls.IMPORT_CWXML_TYPE.from_xml_file(filepath)
+        cwxml = cls.IMPORT_CWXML_FUNC(filepath)
         converter = cls(cwxml)
         converter.filepath = filepath
 
