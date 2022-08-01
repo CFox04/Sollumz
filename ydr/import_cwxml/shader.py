@@ -149,7 +149,7 @@ class ShaderCWXMLConverter(CWXMLConverter[ydrxml.ShaderItem]):
         if node.image is not None and not node.texture_properties.embedded:
             # Set external texture name for non-embedded textures
             node.image.source = "FILE"
-            node.image.filepath = "//" + node.image.name + ".dds"
+            node.image.filepath = "//" + param.texture_name + ".dds"
 
     def assign_extra_detail_node(self):
         """Assign extra detail node sampler image for viewing."""
