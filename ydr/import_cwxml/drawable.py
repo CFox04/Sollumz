@@ -1,4 +1,5 @@
 import bpy
+from mathutils import Matrix, Vector
 
 from ...sollumz_object import CWXMLConverter
 from ...sollumz_properties import SollumType, LODLevel, SOLLUMZ_UI_NAMES
@@ -28,6 +29,7 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
     def __init__(self, cwxml: ydrxml.Drawable, external_bones: list[ydrxml.BoneItem] = None):
         super().__init__(cwxml)
         self.materials: list[bpy.types.Material] = []
+        self.uses_external_skeleton = external_bones is not None
         self._bones_cwxml: list[ydrxml.BoneItem] = external_bones or []
 
     def create_bpy_object(self, name: str) -> bpy.types.Object:
@@ -67,6 +69,10 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
                 model_object = self.create_drawable_model(
                     model_cwxml, lod_level)
                 model_object.parent = self.bpy_object
+
+                if self.cwxml.has_skeleton() and not self.uses_external_skeleton:
+                    self.parent_drawable_model_bones(
+                        model_object, model_cwxml.bone_index)
 
     def create_materials(self):
         """Create all materials from this drawable's cwxml shader group."""
@@ -121,6 +127,33 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
                 geometry.parent = model_object
 
         return model_object
+
+    def parent_drawable_model_bones(self, model_object: bpy.types.Object, bone_index: int):
+        """Set drawable model parent bone based on its bone index."""
+        armature = self.bpy_object
+
+        if armature.type != "ARMATURE":
+            return
+
+        parent_bone_name = None
+        has_bone_translation = False
+
+        if len(armature.pose.bones) > bone_index:
+            parent_bone_name = armature.pose.bones[bone_index].name
+            translation: Vector = self.bones_cwxml[bone_index].translation
+
+            if translation is not None and translation.magnitude > 0:
+                has_bone_translation = True
+
+        if parent_bone_name is not None:
+            # Preserve transforms after parenting
+            original_world_mat = model_object.matrix_world.copy()
+
+            model_object.parent_type = "BONE"
+            model_object.parent_bone = parent_bone_name
+
+            if has_bone_translation is False:
+                model_object.matrix_world = original_world_mat
 
     def create_drawable_model_geometry(self, geometry_cwxml: ydrxml.GeometryItem):
         """Create a geometry object for the given drawable model bpy object."""
