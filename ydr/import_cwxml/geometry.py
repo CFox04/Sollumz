@@ -125,33 +125,6 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
                 self.bpy_object.vertex_groups[i].add(
                     [vertex_index], weight, "ADD")
 
-    def get_vertices_indices_split_by_bone(self):
-        vertex_data = self.cwxml.vertex_buffer.get_data()
-        indices = self.cwxml.index_buffer.data
-        vertex_bone_map = {}
-        index_bone_map = {}
-
-        for vertex in vertex_data:
-            if hasattr(vertex, "blendindices"):
-                for bone_index in vertex.blendindices:
-                    if bone_index not in vertex_bone_map:
-                        vertex_bone_map[bone_index] = []
-
-                    if vertex not in vertex_bone_map[bone_index]:
-                        vertex_bone_map[bone_index].append(vertex)
-
-        for vertex_index in indices:
-            vertex = vertex_data[vertex_index]
-            if hasattr(vertex, "blendindices"):
-                for bone_index in vertex.blendindices:
-                    if bone_index not in index_bone_map:
-                        index_bone_map[bone_index] = []
-
-                    index_bone_map[bone_index].append(
-                        vertex_bone_map[bone_index].index(vertex))
-
-        return vertex_bone_map, index_bone_map
-
     def create_armature_modifier(self, armature_object: bpy.types.Object):
         modifier = self.bpy_object.modifiers.new("Armature", "ARMATURE")
         modifier.object = armature_object
