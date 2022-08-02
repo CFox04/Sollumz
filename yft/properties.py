@@ -13,7 +13,7 @@ class FragmentProperties(bpy.types.PropertyGroup):
 
 
 class LODProperties(bpy.types.PropertyGroup):
-    type: bpy.props.IntProperty(name="Type", default=0)
+    type: bpy.props.IntProperty(name="Type", default=1, min=1, max=3)
     unknown_14: bpy.props.FloatProperty(name="Unknown14")
     unknown_18: bpy.props.FloatProperty(name="Unknown18")
     unknown_1c: bpy.props.FloatProperty(name="Unknown1C")

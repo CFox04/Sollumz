@@ -26,13 +26,13 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
 
         return self._bones_cwxml
 
-    def __init__(self, cwxml: ydrxml.Drawable, external_bones: list[ydrxml.BoneItem] = None):
+    def __init__(self, cwxml: ydrxml.Drawable, external_bones: list[ydrxml.BoneItem] = None, materials: list[bpy.types.Material] = None):
         super().__init__(cwxml)
-        self.materials: list[bpy.types.Material] = []
         self.uses_external_skeleton = external_bones is not None
         self._bones_cwxml: list[ydrxml.BoneItem] = external_bones or []
+        self.materials = materials or []
 
-    def create_bpy_object(self, name: str) -> bpy.types.Object:
+    def create_bpy_object(self, name: str = None) -> bpy.types.Object:
         if self.cwxml.has_skeleton():
             skeleton_converter = SkeletonCWXMLConverter(
                 cwxml=self.cwxml.skeleton)
@@ -65,7 +65,8 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
 
     def create_all_drawable_models(self):
         """Create all drawable models and parent them to the drawable."""
-        self.create_materials()
+        if not self.materials:
+            self.create_materials()
 
         for models_group, lod_level in zip(self.cwxml.drawable_model_groups, list(LODLevel)):
             for model_cwxml in models_group:
@@ -154,10 +155,10 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
     def create_drawable_model_geometry(self, geometry_cwxml: ydrxml.GeometryItem):
         """Create a geometry object for the given drawable model bpy object."""
         geometry_converter = GeometryCWXMLConverter(
-            geometry_cwxml)
+            geometry_cwxml, self.materials)
 
         geometry_converter.create_bpy_object(
-            self.cwxml.name, self.bones_cwxml, self.materials)
+            self.cwxml.name, self.bones_cwxml)
 
         if self.cwxml.has_skeleton():
             geometry_converter.create_armature_modifier(self.bpy_object)
