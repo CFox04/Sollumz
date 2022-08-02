@@ -29,6 +29,7 @@ from .tools.ytyphelper import ytyp_from_objects
 
 from .ydr.import_cwxml.drawable import DrawableCWXMLConverter
 from .ydd.import_cwxml.drawable_dictionary import DrawableDictionaryCWXMLConverter
+from .yft.import_cwxml.fragment import FragmentCWXMLConverter
 
 
 class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
@@ -70,7 +71,7 @@ class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
                     filepath, self)
                 valid_type = True
             elif ext == YFT.file_extension:
-                import_yft(filepath, self.import_settings)
+                FragmentCWXMLConverter.bpy_from_xml_file(filepath, self)
                 valid_type = True
             elif ext == YBN.file_extension:
                 import_ybn(filepath)

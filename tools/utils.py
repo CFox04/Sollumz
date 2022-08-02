@@ -2,6 +2,9 @@ import os
 import numpy
 from math import sqrt
 from mathutils import Vector, Quaternion
+from typing import TypeVar, Union
+
+T = TypeVar('T')
 
 
 def get_file_name(path: str) -> str:
@@ -14,7 +17,7 @@ def get_file_name(path: str) -> str:
     return filename
 
 
-def get_list_item(list, index):
+def get_list_item(list: list[T], index: int) -> Union[T, None]:
     """Get item of list without the risk of an error being thrown"""
     if 0 <= index < len(list):
         return list[index]
