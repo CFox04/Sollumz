@@ -34,14 +34,15 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
     def vertex_components(self, new_vertex_components):
         self._vertex_components = new_vertex_components
 
-    def __init__(self, cwxml: GeometryItem):
+    def __init__(self, cwxml: GeometryItem, materials: list[bpy.types.Material]):
         super().__init__(cwxml)
         self._vertex_components = None
         self.mesh: bpy.types.Mesh = None
+        self.materials = materials
 
-    def create_bpy_object(self, name: str, bones: list[BoneItem], materials: list[bpy.types.Material]) -> bpy.types.Object:
+    def create_bpy_object(self, name: str, bones: list[BoneItem]) -> bpy.types.Object:
         # Editing mesh data-block before assigning it to an object is a lot quicker for some reason
-        mesh = self.create_mesh(name, materials)
+        mesh = self.create_mesh(name)
 
         geometry_object = create_sollumz_object(
             SollumType.DRAWABLE_GEOMETRY, mesh, name=name)
@@ -50,11 +51,12 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
         self.create_vertex_groups(bones)
         self.set_geometry_weights()
 
-        create_tinted_shader_graph(geometry_object)
+        if self.materials:
+            create_tinted_shader_graph(geometry_object)
 
         return geometry_object
 
-    def create_mesh(self, name: str, materials: list[bpy.types.Material]) -> bpy.types.Mesh:
+    def create_mesh(self, name: str) -> bpy.types.Mesh:
         """Create the mesh data-block for this geometry."""
 
         # Split indices into groups of 3
@@ -66,7 +68,7 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
         mesh.from_pydata(self.vertex_components.positions, [], faces)
         mesh.validate()
 
-        self.create_material(materials)
+        self.create_material()
         self.set_smooth_normals()
 
         self.create_uv_layers()
@@ -74,16 +76,19 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
 
         return mesh
 
-    def create_material(self, materials: list[bpy.types.Material]):
+    def create_material(self):
         """Set material for this geometry based on the index of the shader on the drawable.
         Displays warning when not found."""
+        if not self.materials:
+            return
+
         shader_index = self.cwxml.shader_index
-        if not 0 <= shader_index < len(materials):
+        if not 0 <= shader_index < len(self.materials):
             self.import_operator.report(
                 {"WARNING"}, f"Material not set for {self.mesh}. Shader index of {shader_index} not found!")
             return
 
-        self.mesh.materials.append(materials[shader_index])
+        self.mesh.materials.append(self.materials[shader_index])
 
     def set_smooth_normals(self):
         """Set the normals of this geometry and smooth them."""

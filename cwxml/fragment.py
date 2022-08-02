@@ -173,6 +173,10 @@ class PhysicsProperty(ElementTree):
         self.lod2 = LODProperty("LOD2")
         self.lod3 = LODProperty("LOD3")
 
+    def get_populated_lods(self):
+        """Returns all LODs that contain physics groups."""
+        return [lod for lod in [self.lod1, self.lod2, self.lod3] if lod.groups]
+
 
 class ShatterMapProperty(ElementProperty):
     value_types = (list)
