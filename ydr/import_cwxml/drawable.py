@@ -1,5 +1,5 @@
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Vector
 
 from ...sollumz_object import CWXMLConverter
 from ...sollumz_properties import SollumType, LODLevel, SOLLUMZ_UI_NAMES
@@ -10,7 +10,6 @@ from ..ydrimport import geometry_to_obj_split_by_bone, create_lights
 from ..shader_materials import create_tinted_shader_graph
 from .geometry import GeometryCWXMLConverter
 from .skeleton import SkeletonCWXMLConverter
-from .light import LightCWXMLConverter
 from .shader import ShaderCWXMLConverter
 
 

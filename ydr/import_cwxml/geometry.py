@@ -6,7 +6,7 @@ from ...cwxml.drawable import GeometryItem, BoneItem
 from ...sollumz_object import CWXMLConverter
 from ...sollumz_properties import SollumType
 from ...tools.meshhelper import create_uv_layer, create_vertexcolor_layer
-from ...tools.blenderhelper import create_sollumz_mesh_object
+from ...tools.blenderhelper import create_sollumz_object
 from ..shader_materials import create_tinted_shader_graph
 
 
@@ -37,17 +37,32 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
     def __init__(self, cwxml: GeometryItem):
         super().__init__(cwxml)
         self._vertex_components = None
+        self.mesh: bpy.types.Mesh = None
 
     def create_bpy_object(self, name: str, bones: list[BoneItem], materials: list[bpy.types.Material]) -> bpy.types.Object:
-        geometry_object = create_sollumz_mesh_object(
-            SollumType.DRAWABLE_GEOMETRY, name=name)
+        # Editing mesh data-block before assigning it to an object is a lot quicker for some reason
+        mesh = self.create_mesh(name, materials)
+
+        geometry_object = create_sollumz_object(
+            SollumType.DRAWABLE_GEOMETRY, mesh, name=name)
         self.bpy_object = geometry_object
+
+        self.create_vertex_groups(bones)
+        self.set_geometry_weights()
+
+        create_tinted_shader_graph(geometry_object)
+
+        return geometry_object
+
+    def create_mesh(self, name: str, materials: list[bpy.types.Material]) -> bpy.types.Mesh:
+        """Create the mesh data-block for this geometry."""
 
         # Split indices into groups of 3
         indices = self.cwxml.index_buffer.data
         faces = [indices[i:i + 3] for i in range(0, len(indices), 3)]
 
-        mesh: bpy.types.Mesh = geometry_object.data
+        mesh: bpy.types.Mesh = bpy.data.meshes.new(name)
+        self.mesh = mesh
         mesh.from_pydata(self.vertex_components.positions, [], faces)
         mesh.validate()
 
@@ -57,44 +72,36 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
         self.create_uv_layers()
         self.create_vertex_color_layers()
 
-        self.create_vertex_groups(bones)
-        self.set_geometry_weights()
-
-        create_tinted_shader_graph(geometry_object)
-
-        return geometry_object
+        return mesh
 
     def create_material(self, materials: list[bpy.types.Material]):
         """Set material for this geometry based on the index of the shader on the drawable.
         Displays warning when not found."""
         shader_index = self.cwxml.shader_index
-        mesh: bpy.types.Mesh = self.bpy_object.data
-
         if not 0 <= shader_index < len(materials):
             self.import_operator.report(
-                {"WARNING"}, f"Material not set for {mesh}. Shader index of {shader_index} not found!")
+                {"WARNING"}, f"Material not set for {self.mesh}. Shader index of {shader_index} not found!")
             return
 
-        mesh.materials.append(materials[shader_index])
+        self.mesh.materials.append(materials[shader_index])
 
     def set_smooth_normals(self):
         """Set the normals of this geometry and smooth them."""
-        mesh: bpy.types.Mesh = self.bpy_object.data
-
-        mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
-        mesh.normals_split_custom_set_from_vertices(
+        self.mesh.polygons.foreach_set(
+            "use_smooth", [True] * len(self.mesh.polygons))
+        self.mesh.normals_split_custom_set_from_vertices(
             self.vertex_components.normals)
-        mesh.use_auto_smooth = True
+        self.mesh.use_auto_smooth = True
 
     def create_uv_layers(self):
         """Create all uv layers for this geometry."""
         for i, (name, coords) in enumerate(self.vertex_components.uv_map.items()):
-            create_uv_layer(self.bpy_object.data, i, name, coords)
+            create_uv_layer(self.mesh, i, name, coords)
 
     def create_vertex_color_layers(self):
         """Create all vertex color layers for this geometry."""
         for i, (name, coords) in enumerate(self.vertex_components.color_map.items()):
-            create_vertexcolor_layer(self.bpy_object.data, i, name, coords)
+            create_vertexcolor_layer(self.mesh, i, name, coords)
 
     def create_vertex_groups(self, bones: list[BoneItem]):
         """Create vertex groups for this geometry based on the number
