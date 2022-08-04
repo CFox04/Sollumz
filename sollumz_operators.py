@@ -15,8 +15,6 @@ from .cwxml.ytyp import YTYP
 from .cwxml.ymap import YMAP, EntityItem, CMapData
 from .ydr.ydrexport import export_ydr
 from .ydd.yddexport import export_ydd
-from .yft.yftimport import import_yft
-from .yft.yftexport import export_yft
 from .ybn.ybnimport import import_ybn
 from .ybn.ybnexport import export_ybn
 from .ynv.ynvimport import import_ynv
@@ -30,6 +28,7 @@ from .tools.ytyphelper import ytyp_from_objects
 from .ydr.import_cwxml.drawable import DrawableCWXMLConverter
 from .ydd.import_cwxml.drawable_dictionary import DrawableDictionaryCWXMLConverter
 from .yft.import_cwxml.fragment import FragmentCWXMLConverter
+from .yft.export_cwxml.fragment import FragmentBPYConverter
 
 
 class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
@@ -259,7 +258,7 @@ class SOLLUMZ_OT_export(SOLLUMZ_OT_base, bpy.types.Operator):
                     "pack:/", "")
                 filepath = self.get_filepath(
                     remove_number_suffix(name.lower()), YFT.file_extension)
-                export_yft(self, obj, filepath, self.export_settings)
+                FragmentBPYConverter.bpy_to_xml_file(filepath, obj, self)
                 valid_type = True
             elif obj.sollum_type == SollumType.CLIP_DICTIONARY:
                 filepath = self.get_filepath(
