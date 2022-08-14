@@ -1,21 +1,47 @@
 import bpy
+from typing import Union
 
 from ...sollumz_converter import CWXMLConverter
 from ...cwxml import fragment as yftxml
-from ...sollumz_properties import SollumType
-from ...tools.blenderhelper import create_sollumz_object
+from ...cwxml import drawable as ydrxml
+from ...sollumz_properties import LODLevel, SollumType
+from ...tools.blenderhelper import create_sollumz_object, join_objects
+from ...ydr.import_cwxml.geometry import GeometryCWXMLConverter
 
 
 class PhysicsGroupCWXMLConverter(CWXMLConverter[yftxml.GroupItem]):
     """Converts fragment physics group cwxml to bpy object."""
 
+    def __init__(self, cwxml: yftxml.LODProperty, materials: list[bpy.types.Material], geometries: dict[LODLevel, Union[ydrxml.GeometryItem, None]]):
+        super().__init__(cwxml)
+        self.materials: list[bpy.types.Material] = materials
+        self.geometries = geometries
+
     def create_bpy_object(self) -> bpy.types.Object:
-        self.bpy_object = create_sollumz_object(
-            SollumType.FRAGGROUP, name=self.cwxml.name + "_group")
+        if self.geometries is not None:
+            self.create_object_from_geometry()
+
+        if self.bpy_object is None:
+            self.bpy_object = create_sollumz_object(
+                SollumType.FRAGGROUP, name=self.cwxml.name)
 
         self.set_physics_group_properties()
 
         return self.bpy_object
+
+    def create_object_from_geometry(self):
+        """Create group object from a geometry cwxml"""
+        if self.geometries is None:
+            return
+
+        geometries = self.geometries[LODLevel.HIGH]
+
+        if not geometries:
+            return
+
+        self.bpy_object = PhysicsGroupCWXMLConverter.create_and_join_geometries(
+            geometries, self.materials, self.cwxml.name)
+        self.bpy_object.sollum_type = SollumType.FRAGGROUP
 
     def set_physics_group_properties(self):
         """Set properties of physics group object based on the provided cwxml."""
@@ -49,3 +75,13 @@ class PhysicsGroupCWXMLConverter(CWXMLConverter[yftxml.GroupItem]):
         group.group_properties.unk_float_74 = group_cwxml.unk_float_74
         group.group_properties.unk_float_78 = group_cwxml.unk_float_78
         group.group_properties.unk_float_a8 = group_cwxml.unk_float_a8
+
+    @staticmethod
+    def create_and_join_geometries(geometries: list[ydrxml.GeometryItem], materials: list[bpy.types.Material], name: str):
+        geometry_objs = []
+        for geometry_cwxml in geometries:
+            geometry_obj = GeometryCWXMLConverter(
+                geometry_cwxml, materials).create_bpy_object(name)
+            geometry_objs.append(geometry_obj)
+
+        return join_objects(geometry_objs)

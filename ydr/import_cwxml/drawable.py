@@ -85,6 +85,8 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
                 shader_cwxml, self.filepath, self.cwxml.shader_group.texture_dictionary).create_bpy_object()
             self.materials.append(material)
 
+        return self.materials
+
     def create_embedded_collisions(self):
         """Create all collisions defined in the drawable."""
         # TODO: Old code. Ybn import still needs rewrite.

@@ -5,20 +5,24 @@ from typing import Union
 
 from ...sollumz_converter import CWXMLConverter
 from ...cwxml import fragment as yftxml
-from ...sollumz_properties import SollumType
-from ...tools.blenderhelper import create_sollumz_object
+from ...cwxml import drawable as ydrxml
+from ...sollumz_properties import SollumType, LODLevel
+from ...tools.blenderhelper import create_sollumz_object, join_objects
 from ...tools.utils import get_list_item
 from .physicsgroup import PhysicsGroupCWXMLConverter
 from .physicschild import PhysicsChildCWXMLConverter
+from ...ydr.import_cwxml.geometry import GeometryCWXMLConverter
 
 
 class PhysicsLodCWXMLConverter(CWXMLConverter[yftxml.LODProperty]):
     """Converts fragment physics lod cwxml to bpy object."""
 
-    def __init__(self, cwxml: yftxml.LODProperty, materials: list[bpy.types.Material]):
+    def __init__(self, cwxml: yftxml.LODProperty, materials: list[bpy.types.Material], grouped_geometries: dict[str, ydrxml.GeometryItem], bones: list[ydrxml.BoneItem]):
         super().__init__(cwxml)
         self.groups: list[bpy.types.Object] = []
         self.materials: list[bpy.types.Material] = materials
+        self.grouped_geometries = grouped_geometries
+        self.bones = bones
 
     def create_bpy_object(self, lod_index: int) -> bpy.types.Object:
         if not self.cwxml.archetype.bounds:
@@ -34,8 +38,20 @@ class PhysicsLodCWXMLConverter(CWXMLConverter[yftxml.LODProperty]):
         for group_cwxml in self.cwxml.groups:
             self.create_and_parent_group(group_cwxml)
 
-        for index, child_cwxml in enumerate(self.cwxml.children):
-            self.create_and_parent_child(child_cwxml, index)
+        group_names = [group.name for group in self.cwxml.groups]
+        for lod_level, groups in self.grouped_geometries.items():
+            if lod_level != LODLevel.HIGH:
+                continue
+            for group_name, shader_groups in groups.items():
+                if group_name in group_names:
+                    continue
+                geometry = PhysicsGroupCWXMLConverter.create_and_join_geometries(
+                    shader_groups.values(), self.materials, group_name)
+                # armature: bpy.types.Armature = self.bpy_object.parent.data
+                armature: bpy.types.Armature = bpy.data.objects["pack:/adder"].data
+                bone = armature.bones[group_name]
+                parent_bone_name = bone.parent.name
+                geometry.parent = bpy.data.objects[parent_bone_name]
 
         self.bpy_object.lod_properties.type = lod_index + 1
 
@@ -69,8 +85,19 @@ class PhysicsLodCWXMLConverter(CWXMLConverter[yftxml.LODProperty]):
 
     def create_and_parent_group(self, group_cwxml: yftxml.GroupItem):
         """Create a physics group for this LOD and parent it."""
+        geometries = {lod_level.value: [] for lod_level in LODLevel}
+
+        for lod_level, groups in self.grouped_geometries.items():
+            for group_name, shader_groups in groups.items():
+                # print(group_name, shader_groups)
+                if group_name != group_cwxml.name:
+                    continue
+                for geometry_cwxml in shader_groups.values():
+                    # print(lod_level, group_name, geometry_cwxml)
+                    geometries[lod_level].append(geometry_cwxml)
+
         physics_group = PhysicsGroupCWXMLConverter(
-            group_cwxml).create_bpy_object()
+            group_cwxml, self.materials, geometries).create_bpy_object()
 
         physics_group.parent = self.get_physics_group_parent(group_cwxml)
 

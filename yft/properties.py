@@ -1,5 +1,7 @@
 import bpy
 
+from ..sollumz_properties import LODLevel, items_from_enums
+
 
 class FragmentProperties(bpy.types.PropertyGroup):
     unk_b0: bpy.props.FloatProperty(name="UnknownB0")
@@ -39,6 +41,9 @@ class LODProperties(bpy.types.PropertyGroup):
 
 
 class GroupProperties(bpy.types.PropertyGroup):
+    lod_level: bpy.props.EnumProperty(
+        name="Lod Level", items=items_from_enums(LODLevel))
+
     glass_window_index: bpy.props.IntProperty(name="Glass Window Index")
     glass_flags: bpy.props.IntProperty(name="Glass Flags")
     strength: bpy.props.FloatProperty(name="Strength")
