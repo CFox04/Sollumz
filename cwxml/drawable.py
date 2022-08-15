@@ -1,4 +1,5 @@
 from abc import ABC as AbstractClass, abstractmethod
+from typing import NamedTuple
 from xml.etree import ElementTree as ET
 from .element import (
     AttributeProperty,
@@ -497,6 +498,13 @@ class IndexBuffer(ElementTree):
 class GeometryItem(ElementTree):
     tag_name = "Item"
 
+    class VertexComponents(NamedTuple):
+        positions: list[tuple]
+        normals: list[tuple]
+        uv_map: dict[str, list[tuple[float, float]]]
+        color_map: dict[str, list[tuple[float, float]]]
+        vertex_groups: dict[int, list[tuple[float, float]]]
+
     def __init__(self):
         super().__init__()
         self.shader_index = ValueProperty("ShaderIndex", 0)
@@ -505,6 +513,45 @@ class GeometryItem(ElementTree):
         self.bone_ids = BoneIDProperty()
         self.vertex_buffer = VertexBuffer()
         self.index_buffer = IndexBuffer()
+
+    def get_vertex_components(self):
+        """Split vertex buffer into separate componenets."""
+        vertices = self.vertex_buffer.get_data()
+
+        positions = []
+        normals = []
+        uv_map = {}
+        color_map = {}
+        vertex_groups = {}
+
+        for vertex_index, vertex in enumerate(vertices):
+            positions.append(vertex.position)
+
+            # Vertex layouts differ, so we have to check if a given vertex has the desired attribute
+            if hasattr(vertex, "normal"):
+                normals.append(vertex.normal)
+
+            if hasattr(vertex, "blendweights"):
+                for i in range(0, 4):
+                    weight = vertex.blendweights[i] / 255
+
+                    bone_index = vertex.blendindices[i]
+                    if bone_index not in vertex_groups:
+                        vertex_groups[bone_index] = []
+
+                    vertex_groups[bone_index].append((vertex_index, weight))
+
+            for key, value in vertex._asdict().items():
+                if "texcoord" in key:
+                    if not key in uv_map.keys():
+                        uv_map[key] = []
+                    uv_map[key].append(tuple(value))
+                if "colour" in key:
+                    if not key in color_map.keys():
+                        color_map[key] = []
+                    color_map[key].append(tuple(value))
+
+        return GeometryItem.VertexComponents(positions, normals, uv_map, color_map, vertex_groups)
 
 
 class GeometriesListProperty(ListProperty):

@@ -1,6 +1,5 @@
 import bpy
-from mathutils import Vector
-from typing import NamedTuple
+from typing import Union
 
 from ...cwxml.drawable import GeometryItem, BoneItem
 from ...sollumz_converter import CWXMLConverter
@@ -10,37 +9,17 @@ from ...tools.blenderhelper import create_sollumz_object
 from ..shader_materials import create_tinted_shader_graph
 
 
-class VertexComponents(NamedTuple):
-    positions: list[Vector]
-    normals: list[Vector]
-    uv_map: dict[str, list[tuple[float, float]]]
-    color_map: dict[str, list[tuple[float, float]]]
-    vertex_groups: dict[int, list[tuple[float, float]]]
-
-
 class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
     """Converts geometry inside drawables to bpy objects."""
-    @property
-    def vertex_components(self) -> VertexComponents:
-        """Access vertex data as separate data structures."""
-        if self._vertex_components is None:
-            vertices = self.cwxml.vertex_buffer.get_data()
-            self._vertex_components = GeometryCWXMLConverter.get_vertex_components(
-                vertices)
-
-        return self._vertex_components
-
-    @vertex_components.setter
-    def vertex_components(self, new_vertex_components):
-        self._vertex_components = new_vertex_components
 
     def __init__(self, cwxml: GeometryItem, materials: list[bpy.types.Material]):
         super().__init__(cwxml)
-        self._vertex_components = None
-        self.mesh: bpy.types.Mesh = None
+        self.vertex_components: Union[GeometryItem.VertexComponents, None] = None
+        self.mesh: Union[bpy.types.Mesh, None] = None
         self.materials = materials
 
     def create_bpy_object(self, name: str, bones: list[BoneItem]) -> bpy.types.Object:
+        self.get_vertex_components()
         # Editing mesh data-block before assigning it to an object is a lot quicker for some reason
         mesh = self.create_mesh(name)
 
@@ -55,6 +34,10 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
             create_tinted_shader_graph(geometry_object)
 
         return geometry_object
+
+    def get_vertex_components(self):
+        """Get vertex components from the GeometryItem cwxml."""
+        self.vertex_components = self.cwxml.get_vertex_components()
 
     def create_mesh(self, name: str) -> bpy.types.Mesh:
         """Create the mesh data-block for this geometry."""
@@ -140,44 +123,3 @@ class GeometryCWXMLConverter(CWXMLConverter[GeometryItem]):
     def create_armature_modifier(self, armature_object: bpy.types.Object):
         modifier = self.bpy_object.modifiers.new("Armature", "ARMATURE")
         modifier.object = armature_object
-
-    @staticmethod
-    def get_vertex_components(vertices: list[tuple]):
-        """Split vertex buffer into separate componenets."""
-        positions = []
-        normals = []
-        uv_map = {}
-        color_map = {}
-        vertex_groups = {}
-
-        for vertex_index, vertex in enumerate(vertices):
-            positions.append(vertex.position)
-
-            # Vertex layouts differ, so we have to check if a given vertex has the desired attribute
-            if hasattr(vertex, "normal"):
-                normals.append(Vector(vertex.normal))
-
-            if hasattr(vertex, "blendweights"):
-                for i in range(0, 4):
-                    weight = vertex.blendweights[i] / 255
-
-                    # if weight <= 0.0:
-                    #     continue
-
-                    bone_index = vertex.blendindices[i]
-                    if bone_index not in vertex_groups:
-                        vertex_groups[bone_index] = []
-
-                    vertex_groups[bone_index].append((vertex_index, weight))
-
-            for key, value in vertex._asdict().items():
-                if "texcoord" in key:
-                    if not key in uv_map.keys():
-                        uv_map[key] = []
-                    uv_map[key].append(tuple(value))
-                if "colour" in key:
-                    if not key in color_map.keys():
-                        color_map[key] = []
-                    color_map[key].append(tuple(value))
-
-        return VertexComponents(positions, normals, uv_map, color_map, vertex_groups)
