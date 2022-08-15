@@ -1,3 +1,4 @@
+import bpy
 import bmesh
 from mathutils import Vector, Matrix
 from mathutils.geometry import distance_point_to_plane
@@ -192,20 +193,22 @@ def create_capsule(mesh, diameter=0.5, length=2, use_rot=False):
 
 
 def create_uv_layer(mesh, num, name, texcoords, flip_uvs=True):
-    mesh.uv_layers.new()
+    mesh.uv_layers.new(name=name)
     uv_layer = mesh.uv_layers[num]
-    uv_layer.name = name
     for i in range(len(uv_layer.data)):
-        uv = texcoords[mesh.loops[i].vertex_index]
+        vert_index = mesh.loops[i].vertex_index
+        if vert_index >= len(texcoords):
+            continue
+        uv = texcoords[vert_index]
         if flip_uvs:
             uv = flip_uv(uv)
         uv_layer.data[i].uv = uv
 
 
-def create_vertexcolor_layer(mesh, num, name, colors):
-    mesh.vertex_colors.new(name="Vertex Colors " + str(num))
-    color_layer = mesh.vertex_colors[num]
-    color_layer.name = name
+def create_vertexcolor_layer(mesh: bpy.types.Mesh, num, name, colors):
+    # mesh.vertex_colors.new(name="Vertex Colors " + str(num))
+    mesh.attributes.new(name, type="FLOAT_COLOR", domain="CORNER")
+    color_layer = mesh.attributes[num]
     for i in range(len(color_layer.data)):
         rgba = colors[mesh.loops[i].vertex_index]
         color_layer.data[i].color = divide_list(rgba, 255)

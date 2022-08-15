@@ -124,35 +124,45 @@ def create_tinted_texture_from_image(img):  # move to blenderhelper.py?
     return txt
 
 
+def get_all_tinted_samplers(obj):
+    tinted_samplers = []
+
+    for mat in obj.data.materials:
+        tinted_samplers.append((mat, get_tinted_sampler(mat)))
+
+    return tinted_samplers
+
+
 def create_tinted_shader_graph(obj):  # move to blenderhelper.py?
-    mat = obj.data.materials[0]
-    tint_img = get_tinted_sampler(mat)
-    if mat.shader_properties.filename in ShaderManager.tint_flag_2 or tint_img is None:  # check here or?
-        return
+    tinted_samplers = get_all_tinted_samplers(obj)
 
-    bpy.ops.object.select_all(action="DESELECT")
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.node.new_geometry_nodes_modifier()
-    tnt_ng = create_tinted_geometry_graph()
-    geom = obj.modifiers["GeometryNodes"]
-    geom.node_group = tnt_ng
+    for mat, tint_img in tinted_samplers:
+        if mat.shader_properties.filename in ShaderManager.tint_flag_2 or tint_img is None:  # check here or?
+            continue
 
-    # set input / output variables
-    input_id = geom.node_group.inputs[1].identifier
-    geom[input_id+"_attribute_name"] = "colour0"
-    geom[input_id+"_use_attribute"] = True
-    output_id = geom.node_group.outputs[1].identifier
-    geom[output_id+"_attribute_name"] = "TintColor"
-    geom[output_id+"_use_attribute"] = True
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.context.view_layer.objects.active = obj
+        obj.select_set(True)
+        bpy.ops.node.new_geometry_nodes_modifier()
+        tnt_ng = create_tinted_geometry_graph()
+        geom = obj.modifiers["GeometryNodes"]
+        geom.node_group = tnt_ng
 
-    # create texture and get texture node
-    txt = create_tinted_texture_from_image(tint_img)  # remove this??
-    txt_node = geom.node_group.nodes["Image Texture"]
-    # apply texture
-    txt_node.inputs[0].default_value = txt.image
+        # set input / output variables
+        input_id = geom.node_group.inputs[1].identifier
+        geom[input_id+"_attribute_name"] = "colour0"
+        geom[input_id+"_use_attribute"] = True
+        output_id = geom.node_group.outputs[1].identifier
+        geom[output_id+"_attribute_name"] = "TintColor"
+        geom[output_id+"_use_attribute"] = True
 
-    obj.data.vertex_colors.new(name="TintColor")
+        # create texture and get texture node
+        txt = create_tinted_texture_from_image(tint_img)  # remove this??
+        txt_node = geom.node_group.nodes["Image Texture"]
+        # apply texture
+        txt_node.inputs[0].default_value = txt.image
+
+        obj.data.vertex_colors.new(name="TintColor")
 
 
 def link_geos(links, node1, node2):

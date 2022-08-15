@@ -8,7 +8,7 @@ from ...cwxml import drawable as ydrxml
 from ...ybn.ybnimport import composite_to_obj, bound_to_obj
 from ..ydrimport import geometry_to_obj_split_by_bone, create_lights
 from ..shader_materials import create_tinted_shader_graph
-from .geometry import GeometryCWXMLConverter
+from .model import ModelMeshCWXMLConverter
 from .skeleton import SkeletonCWXMLConverter
 from .shader import ShaderCWXMLConverter
 from .light import LightCWXMLConverter
@@ -45,14 +45,11 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
 
         self.set_drawable_lod_dist()
         self.create_all_drawable_models()
-        self.create_embedded_collisions()
+        # self.create_embedded_collisions()
 
         if self.cwxml.lights:
             LightCWXMLConverter(
                 self.cwxml.lights).create_bpy_object(self.bpy_object)
-
-        if self.import_operator.import_settings.join_geometries:
-            self.join_geometries()
 
         return self.bpy_object
 
@@ -68,15 +65,27 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
         if not self.materials:
             self.create_materials()
 
-        for models_group, lod_level in zip(self.cwxml.drawable_model_groups, list(LODLevel)):
-            for model_cwxml in models_group:
-                model_object = self.create_drawable_model(
-                    model_cwxml, lod_level)
-                model_object.parent = self.bpy_object
+        models_by_index = {}
 
-                if self.cwxml.has_skeleton() and not self.uses_external_skeleton:
-                    self.parent_drawable_model_bones(
-                        model_object, model_cwxml.bone_index)
+        for models_group, lod_level in zip(self.cwxml.drawable_model_groups, list(LODLevel)):
+            for i, model_cwxml in enumerate(models_group):
+                if i not in models_by_index:
+                    models_by_index[i] = {}
+
+                models_by_index[i][lod_level] = model_cwxml
+
+        for models in models_by_index.values():
+            model_object = ModelMeshCWXMLConverter.create_model_object(self.bpy_object.name,
+                                                                       models, self.materials, self.bones_cwxml)
+
+            if not model_object:
+                continue
+
+            model_object.parent = self.bpy_object
+
+            if self.cwxml.has_skeleton() and not self.uses_external_skeleton:
+                self.parent_drawable_model_bones(
+                    model_object, model_cwxml.bone_index)
 
     def create_materials(self):
         """Create all materials from this drawable's cwxml shader group."""
@@ -98,32 +107,6 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
                 bobj = bound_to_obj(bound)
                 if bobj:
                     bobj.parent = self.bpy_object
-
-    def create_drawable_model(self, model_cwxml: ydrxml.DrawableModelItem, lod_level: LODLevel):
-        """Create a single drawable model given its cwxml."""
-        model_object = create_sollumz_object(SollumType.DRAWABLE_MODEL)
-
-        model_object.drawable_model_properties.sollum_lod = lod_level
-        model_object.drawable_model_properties.render_mask = model_cwxml.render_mask
-        model_object.drawable_model_properties.unknown_1 = model_cwxml.unknown_1
-        model_object.drawable_model_properties.flags = model_cwxml.flags
-
-        import_settings = self.import_operator.import_settings
-        if not import_settings.join_geometries and import_settings.split_by_bone and model_cwxml.has_skin == 1:
-            # TODO: This is old code. Still need to implement split by bone in rewrite.
-            child_objs = geometry_to_obj_split_by_bone(
-                model_cwxml, self.materials, self.bones_cwxml)
-            for child_obj in child_objs:
-                child_obj.parent = model_object
-                for mat in self.materials:
-                    child_obj.data.materials.append(mat)
-                create_tinted_shader_graph(child_obj)
-        else:
-            for geometry_cwxml in model_cwxml.geometries:
-                geometry = self.create_drawable_model_geometry(geometry_cwxml)
-                geometry.parent = model_object
-
-        return model_object
 
     def parent_drawable_model_bones(self, model_object: bpy.types.Object, bone_index: int):
         """Set drawable model parent bone based on its bone index."""
@@ -151,24 +134,3 @@ class DrawableCWXMLConverter(CWXMLConverter[ydrxml.Drawable]):
 
             if has_bone_translation is False:
                 model_object.matrix_world = original_world_mat
-
-    def create_drawable_model_geometry(self, geometry_cwxml: ydrxml.GeometryItem):
-        """Create a geometry object for the given drawable model bpy object."""
-        geometry_converter = GeometryCWXMLConverter(
-            geometry_cwxml, self.materials)
-
-        geometry_converter.create_bpy_object(
-            self.cwxml.name, self.bones_cwxml)
-
-        if self.cwxml.has_skeleton():
-            geometry_converter.create_armature_modifier(self.bpy_object)
-
-        return geometry_converter.bpy_object
-
-    def join_geometries(self):
-        """Join all geometries for this drawable."""
-        for drawable_model in self.bpy_object.children:
-            if drawable_model.sollum_type == SollumType.DRAWABLE_MODEL:
-                geometries = [
-                    child for child in drawable_model.children if child.sollum_type == SollumType.DRAWABLE_GEOMETRY]
-                join_objects(geometries)

@@ -23,7 +23,6 @@ def draw_drawable_model_properties(self, context):
         layout.prop(obj.drawable_model_properties, "render_mask")
         layout.prop(obj.drawable_model_properties, "unknown_1")
         layout.prop(obj.drawable_model_properties, "flags")
-        layout.prop(obj.drawable_model_properties, "sollum_lod")
 
 
 def draw_shader(self, context):
@@ -186,7 +185,7 @@ class SOLLUMZ_PT_CREATE_SHADER_PANEL(bpy.types.Panel):
         row2.operator(
             ydr_ops.SOLLUMZ_OT_set_all_textures_embedded.bl_idname)
         row2.operator(
-           ydr_ops.SOLLUMZ_OT_remove_all_textures_embedded.bl_idname)
+            ydr_ops.SOLLUMZ_OT_remove_all_textures_embedded.bl_idname)
 
 
 class SOLLUMZ_PT_CREATE_DRAWABLE_PANEL(bpy.types.Panel):
