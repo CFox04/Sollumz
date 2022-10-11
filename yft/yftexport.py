@@ -39,7 +39,24 @@ def get_shattermap_image(obj):
     return mat.node_tree.nodes["ShatterMap"].image
 
 
-def obj_to_vehicle_window(obj, materials):
+def get_window_geometry_index(drawable, window_material):
+    shaders = drawable.shader_group.shaders
+
+    for dmodel in drawable.drawable_models_high:
+        for (index, geometry) in enumerate(dmodel.geometries):
+            shader_index = geometry.shader_index
+
+            if shader_index > len(shaders):
+                # Shouldnt happen, warning needed here
+                return 0
+
+            if shaders[shader_index].name == window_material.shader_properties.name:
+                return index
+
+    return 0
+
+
+def obj_to_vehicle_window(obj, drawable):
     mesh = obj.data
 
     v1 = None
@@ -74,7 +91,8 @@ def obj_to_vehicle_window(obj, materials):
     window = WindowItem()
     window.projection_matrix = mat
     window.shattermap = image_to_shattermap(shattermap)
-    window.unk_ushort_1 = materials.index(obj.data.materials[1])
+    window.unk_ushort_1 = get_window_geometry_index(
+        drawable, obj.data.materials[1])
     window.unk_float_17 = obj.vehicle_window_properties.unk_float_17
     window.unk_float_18 = obj.vehicle_window_properties.unk_float_18
     window.cracks_texture_tiling = obj.vehicle_window_properties.cracks_texture_tiling
@@ -247,7 +265,7 @@ def fragment_from_object(exportop, fobj, exportpath):
             flod.children.append(child)
 
         for wobj in vwobjs:
-            vehwindow = obj_to_vehicle_window(wobj, materials)
+            vehwindow = obj_to_vehicle_window(wobj, fragment.drawable)
             vehwindow.item_id = get_obj_parent_group_index(gobjs, wobj)
             fragment.vehicle_glass_windows.append(vehwindow)
 
