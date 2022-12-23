@@ -1,4 +1,5 @@
 import bpy
+import re
 from mathutils import Vector
 
 from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
@@ -6,7 +7,12 @@ from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
 
 def remove_number_suffix(string: str):
     """Remove the .00# at that Blender puts at the end of object names."""
-    return string.split(".")[0]
+    match = re.search("\.[0-9]", string)
+
+    if match is None:
+        return string
+
+    return string[:match.start()]
 
 
 def create_brush(name):
@@ -255,10 +261,10 @@ def get_object_with_children(obj):
     return objs
 
 
-def create_mesh_object(sollum_type: SollumType, name: str = None) -> bpy.types.Object:
+def create_mesh_object(sollum_type: SollumType, name: str = None, mesh: bpy.types.Mesh = None) -> bpy.types.Object:
     """Create a bpy mesh object of the given sollum type and link it to the scene."""
     name = name or SOLLUMZ_UI_NAMES[sollum_type]
-    mesh = bpy.data.meshes.new(name)
+    mesh = mesh or bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
     obj.sollum_type = sollum_type
     bpy.context.collection.objects.link(obj)
