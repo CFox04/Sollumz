@@ -56,6 +56,8 @@ class SollumType(str, Enum):
     YMAP_MODEL_OCCLUDER = "sollumz_ymap_model_occluder"
     YMAP_CAR_GENERATOR = "sollumz_ymap_car_generator"
 
+    FRAG_GEOM = "sollumz_fragment_geometry"
+
 
 class LightType(str, Enum):
     NONE = "sollumz_light_none"
@@ -121,6 +123,10 @@ class LODLevel(str, Enum):
     MEDIUM = "sollumz_medium"
     LOW = "sollumz_low"
     VERYLOW = "sollumz_verylow"
+
+
+class ObjectLayer(str, Enum):
+    DAMAGED = "sollumz_layer_damaged"
 
 
 class EntityLodLevel(str, Enum):
@@ -238,6 +244,7 @@ SOLLUMZ_UI_NAMES = {
     SollumType.FRAGCHILD: "Fragment Child",
     SollumType.FRAGLOD: "Fragment LOD",
     SollumType.FRAGVEHICLEWINDOW: "Fragment Vehicle Window",
+    SollumType.FRAG_GEOM: "Fragment Geometry",
 
     SollumType.NONE: "None",
     SollumType.DRAWABLE_DICTIONARY: "Drawable Dictionary",
@@ -317,6 +324,7 @@ SOLLUMZ_UI_NAMES = {
     LODLevel.MEDIUM: "Med",
     LODLevel.LOW: "Low",
     LODLevel.VERYLOW: "Vlow",
+    ObjectLayer.DAMAGED: "Damaged",
 
     EntityLodLevel.LODTYPES_DEPTH_HD: "DEPTH HD",
     EntityLodLevel.LODTYPES_DEPTH_LOD: "DEPTH LOD",

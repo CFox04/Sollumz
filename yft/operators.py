@@ -5,6 +5,7 @@ from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
 from ..tools.blenderhelper import create_empty_object, get_children_recursive
 from ..tools.boundhelper import convert_selected_to_bound
 from ..tools.fragmenthelper import convert_selected_to_fragment
+from .properties import ObjectLayers
 
 
 class SOLLUMZ_OT_create_fragment(SOLLUMZ_OT_base, bpy.types.Operator):
@@ -13,7 +14,6 @@ class SOLLUMZ_OT_create_fragment(SOLLUMZ_OT_base, bpy.types.Operator):
     bl_label = f"Create fragment"
     bl_action = "Create a fragment"
     bl_update_view = True
-
 
     def run(self, context):
         aobj = context.active_object
@@ -40,3 +40,21 @@ class SOLLUMZ_OT_create_fragment(SOLLUMZ_OT_base, bpy.types.Operator):
             if aobj:
                 obj.parent = aobj
             return True
+
+
+class SOLLUMZ_OT_ADD_OBJECT_LAYER(bpy.types.Operator):
+    bl_idname = "sollumz.addobjectlayer"
+    bl_label = "Add Object Layer"
+
+    @classmethod
+    def poll(cls, context):
+        active_obj = context.view_layer.objects.active
+        return active_obj is not None and active_obj.sollum_type == SollumType.FRAG_GEOM
+
+    def execute(self, context):
+        active_obj = context.view_layer.objects.active
+        obj_layers: ObjectLayers = active_obj.sollumz_object_layers
+        layer_type = context.scene.sollumz_object_layer_type
+        obj_layers.add_layer(layer_type)
+
+        return {"FINISHED"}

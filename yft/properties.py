@@ -1,6 +1,7 @@
 import bpy
+from typing import Union
 
-from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
+from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType, ObjectLayer, LODLevel, items_from_enums
 
 
 class FragmentProperties(bpy.types.PropertyGroup):
@@ -97,6 +98,63 @@ class VehicleWindowProperties(bpy.types.PropertyGroup):
         name="Cracks Texture Tiling")
 
 
+class ObjectLayerProperties(bpy.types.PropertyGroup):
+    def update_mesh(self, context):
+        active_obj = context.view_layer.objects.active
+        active_obj_layer = active_obj.sollumz_object_layers.active_layer
+
+        if active_obj_layer == self and self.mesh is not None:
+            active_obj.data = self.mesh
+
+    type: bpy.props.EnumProperty(
+        items=items_from_enums(ObjectLayer, LODLevel))
+    mesh: bpy.props.PointerProperty(type=bpy.types.Mesh, update=update_mesh)
+
+
+class ObjectLayers(bpy.types.PropertyGroup):
+    def get_layer(self, layer_type: str) -> Union[ObjectLayerProperties, None]:
+        for layer in self.layers:
+            if layer.type == layer_type:
+                return layer
+
+    def add_layer(self, layer_type: str, mesh: Union[bpy.types.Mesh, None] = None) -> ObjectLayerProperties:
+        # Can't have multiple layers with the same type
+        if self.get_layer(layer_type):
+            return None
+
+        self.layers.add()
+        i = len(self.layers) - 1
+        obj_layer = self.layers[i]
+        obj_layer.type = layer_type
+
+        if mesh is not None and mesh.type == "MESH":
+            obj_layer.mesh = mesh
+
+        return obj_layer
+
+    def remove_layer(self, layer_type: str):
+        for i, layer in enumerate(self.layers):
+            if layer.type == layer_type:
+                self.layers.remove(i)
+                return
+
+    def update_active_layer(self, context):
+        if self.active_layer.mesh is None:
+            return
+
+        active_obj = context.view_layer.objects.active
+        active_obj.data = self.active_layer.mesh
+
+    @property
+    def active_layer(self) -> Union[ObjectLayerProperties, None]:
+        if self.active_layer_index < len(self.layers):
+            return self.layers[self.active_layer_index]
+
+    layers: bpy.props.CollectionProperty(type=ObjectLayerProperties)
+    active_layer_index: bpy.props.IntProperty(
+        min=0, update=update_active_layer)
+
+
 def register():
     bpy.types.Object.fragment_properties = bpy.props.PointerProperty(
         type=FragmentProperties)
@@ -126,6 +184,10 @@ def register():
         name="Type",
         default=SollumType.FRAGMENT.value
     )
+    bpy.types.Object.sollumz_object_layers = bpy.props.PointerProperty(
+        type=ObjectLayers)
+    bpy.types.Scene.sollumz_object_layer_type = bpy.props.EnumProperty(
+        items=items_from_enums(ObjectLayer, LODLevel))
 
 
 def unregister():
@@ -133,3 +195,5 @@ def unregister():
     bpy.types.Object.lod_properties
     bpy.types.Object.group_properties
     bpy.types.Object.child_properties
+    del bpy.types.Object.sollumz_object_layers
+    del bpy.types.Scene.sollumz_object_layer_type
