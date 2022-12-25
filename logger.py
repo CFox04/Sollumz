@@ -17,12 +17,12 @@ def _log(msg: str, level: str):
 
     try:
         _logging_operator.report({level}, msg)
+        print(f"{level}: {msg}")
     except ReferenceError:
         print(_NO_LOGGING_OPERATOR_WARNING)
 
 
 def set_logging_operator(operator: Operator):
-    print(type(operator))
     global _logging_operator
     _logging_operator = operator
 

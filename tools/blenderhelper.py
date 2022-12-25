@@ -255,10 +255,10 @@ def get_object_with_children(obj):
     return objs
 
 
-def create_mesh_object(sollum_type: SollumType, name: str = None) -> bpy.types.Object:
+def create_mesh_object(sollum_type: SollumType, name: str = None, mesh: bpy.types.Mesh = None) -> bpy.types.Object:
     """Create a bpy mesh object of the given sollum type and link it to the scene."""
     name = name or SOLLUMZ_UI_NAMES[sollum_type]
-    mesh = bpy.data.meshes.new(name)
+    mesh = mesh or bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
     obj.sollum_type = sollum_type
     bpy.context.collection.objects.link(obj)

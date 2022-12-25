@@ -57,6 +57,7 @@ class SollumType(str, Enum):
     YMAP_CAR_GENERATOR = "sollumz_ymap_car_generator"
 
     FRAG_GEOM = "sollumz_fragment_geometry"
+    FRAG_DUMMY = "sollumz_fragment_dummy"
 
 
 class LightType(str, Enum):
@@ -123,9 +124,11 @@ class LODLevel(str, Enum):
     MEDIUM = "sollumz_medium"
     LOW = "sollumz_low"
     VERYLOW = "sollumz_verylow"
+    VERYHIGH = "sollumz_veryhigh"
 
 
 class ObjectLayer(str, Enum):
+    PRISTINE = "sollumz_layer_pristine"
     DAMAGED = "sollumz_layer_damaged"
 
 
@@ -163,6 +166,11 @@ class AssetType(str, Enum):
 FRAGMENT_TYPES = [
     SollumType.FRAGMENT,
     SollumType.FRAGGROUP,
+    SollumType.FRAGCHILD,
+    SollumType.FRAGLOD,
+    SollumType.FRAG_GEOM,
+    SollumType.FRAG_DUMMY,
+    SollumType.FRAGVEHICLEWINDOW,
 ]
 
 BOUND_TYPES = [
@@ -245,6 +253,7 @@ SOLLUMZ_UI_NAMES = {
     SollumType.FRAGLOD: "Fragment LOD",
     SollumType.FRAGVEHICLEWINDOW: "Fragment Vehicle Window",
     SollumType.FRAG_GEOM: "Fragment Geometry",
+    SollumType.FRAG_DUMMY: "Fragment Dummy",
 
     SollumType.NONE: "None",
     SollumType.DRAWABLE_DICTIONARY: "Drawable Dictionary",
@@ -320,11 +329,13 @@ SOLLUMZ_UI_NAMES = {
     TextureFormat.A8: "D3DFMT_A8",
     TextureFormat.L8: "D3DFMT_L8",
 
+    LODLevel.VERYHIGH: "Very High",
     LODLevel.HIGH: "High",
     LODLevel.MEDIUM: "Med",
     LODLevel.LOW: "Low",
-    LODLevel.VERYLOW: "Vlow",
+    LODLevel.VERYLOW: "Very Low",
     ObjectLayer.DAMAGED: "Damaged",
+    ObjectLayer.PRISTINE: "Pristine",
 
     EntityLodLevel.LODTYPES_DEPTH_HD: "DEPTH HD",
     EntityLodLevel.LODTYPES_DEPTH_LOD: "DEPTH LOD",
@@ -534,10 +545,16 @@ class SollumzImportSettings(bpy.types.PropertyGroup):
         default=False,
     )
 
-    split_by_bone: bpy.props.BoolProperty(
-        name="Split by Bone",
-        description="Splits the geometries by bone.",
-        default=False,
+    import_with_hi: bpy.props.BoolProperty(
+        name="Import with _hi",
+        description="Import the selected .yft.xml with the <name>_hi.yft.xml placed in the very high LOD (must be in the same directory).",
+        default=True
+    )
+
+    split_by_group: bpy.props.BoolProperty(
+        name="Split Mesh by Group",
+        description="Splits the mesh by vertex groups.",
+        default=True,
     )
 
     import_ext_skeleton: bpy.props.BoolProperty(
@@ -822,13 +839,13 @@ def register():
     bpy.types.Scene.hide_collision = bpy.props.BoolProperty(
         name="Hide Collision", get=get_hide_collisions, set=set_hide_collisions)
     bpy.types.Scene.hide_high_lods = bpy.props.BoolProperty(
-        name="Hide High LODS", get=get_hide_high_lods, set=set_hide_high_lods)
+        name="Hide High Models", get=get_hide_high_lods, set=set_hide_high_lods)
     bpy.types.Scene.hide_medium_lods = bpy.props.BoolProperty(
-        name="Hide Medium LODS", get=get_hide_medium_lods, set=set_hide_medium_lods)
+        name="Hide Medium Models", get=get_hide_medium_lods, set=set_hide_medium_lods)
     bpy.types.Scene.hide_low_lods = bpy.props.BoolProperty(
-        name="Hide Low LODS", get=get_hide_low_lods, set=set_hide_low_lods)
+        name="Hide Low Models", get=get_hide_low_lods, set=set_hide_low_lods)
     bpy.types.Scene.hide_very_low_lods = bpy.props.BoolProperty(
-        name="Hide Very Low LODS", get=get_hide_very_low_lods, set=set_hide_very_low_lods)
+        name="Hide Very Low Models", get=get_hide_very_low_lods, set=set_hide_very_low_lods)
     bpy.types.Scene.hide_vehicle_windows = bpy.props.BoolProperty(
         name="Hide Vehicle Windows", get=get_hide_vehicle_windows, set=set_hide_vehicle_windows)
 

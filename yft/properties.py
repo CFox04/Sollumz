@@ -1,7 +1,7 @@
 import bpy
 from typing import Union
 
-from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType, ObjectLayer, LODLevel, items_from_enums
+from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType, LODLevel, items_from_enums
 
 
 class FragmentProperties(bpy.types.PropertyGroup):
@@ -16,7 +16,11 @@ class FragmentProperties(bpy.types.PropertyGroup):
 
 
 class LODProperties(bpy.types.PropertyGroup):
-    type: bpy.props.IntProperty(name="Type", default=1)
+    def get_name(self) -> str:
+        return f"LOD{self.number}"
+
+    number: bpy.props.IntProperty(name="Number", default=1)
+
     unknown_14: bpy.props.FloatProperty(name="Unknown14")
     unknown_18: bpy.props.FloatProperty(name="Unknown18")
     unknown_1c: bpy.props.FloatProperty(name="Unknown1C")
@@ -69,7 +73,6 @@ class GroupProperties(bpy.types.PropertyGroup):
     rotation_strength: bpy.props.FloatProperty(name="Restoring Strength")
     restoring_max_torque: bpy.props.FloatProperty(name="Restoring Max Torque")
     latch_strength: bpy.props.FloatProperty(name="Latch Strength")
-    mass: bpy.props.FloatProperty(name="Mass")
     min_damage_force: bpy.props.FloatProperty(name="Min Damage Force")
     damage_health: bpy.props.FloatProperty(name="Damage Health")
     unk_float_5c: bpy.props.FloatProperty(name="UnkFloat5C")
@@ -84,11 +87,8 @@ class GroupProperties(bpy.types.PropertyGroup):
 
 
 class ChildProperties(bpy.types.PropertyGroup):
-    bone_tag: bpy.props.IntProperty(name="Bone Tag")
-    pristine_mass: bpy.props.FloatProperty(name="Pristine Mass")
-    damaged_mass: bpy.props.FloatProperty(name="Damaged Mass")
-    unk_vec: bpy.props.FloatVectorProperty(name="UnkVec")
-    inertia_tensor: bpy.props.FloatVectorProperty(name="InertiaTensor", size=4)
+    mass: bpy.props.FloatProperty(name="Mass", min=0)
+    damaged: bpy.props.BoolProperty(name="Damaged")
 
 
 class VehicleWindowProperties(bpy.types.PropertyGroup):
@@ -98,74 +98,106 @@ class VehicleWindowProperties(bpy.types.PropertyGroup):
         name="Cracks Texture Tiling")
 
 
-class ObjectLayerProperties(bpy.types.PropertyGroup):
-    def update_mesh(self, context):
-        active_obj = context.view_layer.objects.active
-        active_obj_layer = active_obj.sollumz_object_layers.active_layer
+class ObjectLODProps(bpy.types.PropertyGroup):
+    def update_object(self, context):
+        obj: bpy.types.Object = self.id_data
 
-        if active_obj_layer == self and self.mesh is not None:
-            active_obj.data = self.mesh
+        active_obj_lod = obj.sollumz_object_lods.active_lod
+
+        if active_obj_lod == self and self.mesh is not None:
+            obj.data = self.mesh
+            obj.hide_set(False)
+        elif self.mesh is None:
+            obj.hide_set(True)
 
     type: bpy.props.EnumProperty(
-        items=items_from_enums(ObjectLayer, LODLevel))
-    mesh: bpy.props.PointerProperty(type=bpy.types.Mesh, update=update_mesh)
+        items=items_from_enums(LODLevel))
+    mesh: bpy.props.PointerProperty(
+        type=bpy.types.Mesh, update=update_object)
 
 
-class ObjectLayers(bpy.types.PropertyGroup):
-    def get_layer(self, layer_type: str) -> Union[ObjectLayerProperties, None]:
-        for layer in self.layers:
-            if layer.type == layer_type:
-                return layer
+class LODLevels(bpy.types.PropertyGroup):
+    def get_lod(self, lod_type: str) -> Union[ObjectLODProps, None]:
+        for lod in self.lods:
+            if lod.type == lod_type:
+                return lod
 
-    def add_layer(self, layer_type: str, mesh: Union[bpy.types.Mesh, None] = None) -> ObjectLayerProperties:
-        # Can't have multiple layers with the same type
-        if self.get_layer(layer_type):
+    def set_lod_mesh(self, lod_type: str, mesh: bpy.types.Mesh) -> Union[ObjectLODProps, None]:
+        for lod in self.lods:
+            if lod.type == lod_type:
+                lod.mesh = mesh
+                return lod
+
+    def add_lod(self, lod_type: str, mesh: Union[bpy.types.Mesh, None] = None) -> ObjectLODProps:
+        # Can't have multiple lods with the same type
+        if self.get_lod(lod_type):
             return None
 
-        self.layers.add()
-        i = len(self.layers) - 1
-        obj_layer = self.layers[i]
-        obj_layer.type = layer_type
+        self.lods.add()
+        i = len(self.lods) - 1
+        obj_lod = self.lods[i]
+        obj_lod.type = lod_type
 
-        if mesh is not None and mesh.type == "MESH":
-            obj_layer.mesh = mesh
+        if mesh is not None:
+            obj_lod.mesh = mesh
 
-        return obj_layer
+        return obj_lod
 
-    def remove_layer(self, layer_type: str):
-        for i, layer in enumerate(self.layers):
-            if layer.type == layer_type:
-                self.layers.remove(i)
+    def remove_lod(self, lod_type: str):
+        for i, lod in enumerate(self.lods):
+            if lod.type == lod_type:
+                self.lods.remove(i)
                 return
 
-    def update_active_layer(self, context):
-        if self.active_layer.mesh is None:
-            return
+    def set_active_lod(self, lod_type: str):
+        for i, lod in enumerate(self.lods):
+            if lod.type == lod_type:
+                self.active_lod_index = i
+                return
 
-        active_obj = context.view_layer.objects.active
-        active_obj.data = self.active_layer.mesh
+    def update_active_lod(self, context):
+        self.active_lod.update_object(context)
+
+    def add_empty_lods(self):
+        """Add all LOD lods with no meshes assigned."""
+        self.add_lod(LODLevel.VERYHIGH)
+        self.add_lod(LODLevel.HIGH)
+        self.add_lod(LODLevel.MEDIUM)
+        self.add_lod(LODLevel.LOW)
+        self.add_lod(LODLevel.VERYLOW)
+
+    # def rename_meshes(self, obj_name: str):
+    #     """Rename meshes to <obj_name>_<lod_level>"""
+    #     for lod in self.lods:
+    #         if lod.mesh is None:
+    #             continue
+    #         lod_level = SOLLUMZ_UI_NAMES[lod.type].lower().replace(' ', '_')
+    #         lod.mesh.name = f"{obj_name}_{lod_level}"
 
     @property
-    def active_layer(self) -> Union[ObjectLayerProperties, None]:
-        if self.active_layer_index < len(self.layers):
-            return self.layers[self.active_layer_index]
+    def active_lod(self) -> Union[ObjectLODProps, None]:
+        if self.active_lod_index < len(self.lods):
+            return self.lods[self.active_lod_index]
 
-    layers: bpy.props.CollectionProperty(type=ObjectLayerProperties)
-    active_layer_index: bpy.props.IntProperty(
-        min=0, update=update_active_layer)
+    lods: bpy.props.CollectionProperty(type=ObjectLODProps)
+    active_lod_index: bpy.props.IntProperty(
+        min=0, update=update_active_lod)
 
 
 def register():
     bpy.types.Object.fragment_properties = bpy.props.PointerProperty(
         type=FragmentProperties)
-    bpy.types.Object.lod_properties = bpy.props.PointerProperty(
-        type=LODProperties)
-    bpy.types.Object.group_properties = bpy.props.PointerProperty(
-        type=GroupProperties)
     bpy.types.Object.child_properties = bpy.props.PointerProperty(
         type=ChildProperties)
     bpy.types.Object.vehicle_window_properties = bpy.props.PointerProperty(
         type=VehicleWindowProperties)
+    bpy.types.Object.is_physics_child_mesh = bpy.props.BoolProperty(
+        name="Is Physics Child", description="Whether or not this fragment mesh is a physics child. Usually wheels meshes are physics children.")
+
+    bpy.types.Object.sollumz_fragment_lods = bpy.props.CollectionProperty(
+        type=LODProperties)
+    bpy.types.Object.sollumz_active_frag_lod_index = bpy.props.IntProperty(
+        min=0)
 
     bpy.types.Object.glass_thickness = bpy.props.FloatProperty(
         name="Thickness", default=0.1)
@@ -184,16 +216,27 @@ def register():
         name="Type",
         default=SollumType.FRAGMENT.value
     )
-    bpy.types.Object.sollumz_object_layers = bpy.props.PointerProperty(
-        type=ObjectLayers)
-    bpy.types.Scene.sollumz_object_layer_type = bpy.props.EnumProperty(
-        items=items_from_enums(ObjectLayer, LODLevel))
+    bpy.types.Object.sollumz_object_lods = bpy.props.PointerProperty(
+        type=LODLevels)
+
+    bpy.types.Scene.sollumz_frag_is_hidden = bpy.props.BoolProperty()
+
+    bpy.types.Bone.group_properties = bpy.props.PointerProperty(
+        type=GroupProperties)
+    bpy.types.Bone.sollumz_use_physics = bpy.props.BoolProperty(
+        name="Use Physics", description="Whether or not to use physics for this fragment bone")
 
 
 def unregister():
-    bpy.types.Object.fragment_properties
-    bpy.types.Object.lod_properties
-    bpy.types.Object.group_properties
-    bpy.types.Object.child_properties
-    del bpy.types.Object.sollumz_object_layers
-    del bpy.types.Scene.sollumz_object_layer_type
+    del bpy.types.Object.fragment_properties
+    del bpy.types.Object.child_properties
+    del bpy.types.Object.vehicle_window_properties
+    del bpy.types.Object.is_physics_child_mesh
+    del bpy.types.Object.sollumz_fragment_lods
+    del bpy.types.Object.sollumz_active_frag_lod_index
+    del bpy.types.Object.sollumz_object_lods
+
+    del bpy.types.Scene.sollumz_frag_is_hidden
+
+    del bpy.types.Bone.group_properties
+    del bpy.types.Bone.sollumz_use_physics

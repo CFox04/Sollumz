@@ -30,6 +30,9 @@ from .tools.meshhelper import get_bound_extents
 from .tools.utils import subtract_from_vector, add_to_vector, get_min_vector, get_max_vector
 from .tools.blenderhelper import get_terrain_texture_brush, remove_number_suffix
 from .tools.ytyphelper import ytyp_from_objects
+from . import logger
+
+# from .yft.yftimport_old import import_yft as import_yft_old
 
 
 class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
@@ -63,6 +66,7 @@ class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
 
     def import_file(self, filepath, ext):
         try:
+            logger.set_logging_operator(self)
             valid_type = False
             if ext == YDR.file_extension:
                 import_ydr(filepath, self.import_settings)
@@ -71,7 +75,8 @@ class SOLLUMZ_OT_import(SOLLUMZ_OT_base, bpy.types.Operator, ImportHelper):
                 import_ydd(self, filepath, self.import_settings)
                 valid_type = True
             elif ext == YFT.file_extension:
-                import_yft(filepath, self)
+                import_yft(filepath, self.import_settings)
+                # import_yft_old(filepath, self)
                 valid_type = True
             elif ext == YBN.file_extension:
                 import_ybn(filepath)

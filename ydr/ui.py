@@ -285,22 +285,27 @@ class SOLLUMZ_PT_BONE_PANEL(bpy.types.Panel):
     bl_region_type = "WINDOW"
     bl_context = "bone"
 
+    @classmethod
+    def poll(cls, context):
+        return context.active_bone is not None
+
     def draw(self, context):
         layout = self.layout
-        if context.active_pose_bone is None:
-            return
+        layout.use_property_split = True
+        layout.use_property_decorate = False
 
-        bone = context.active_pose_bone.bone
+        bone = context.active_bone
 
-        layout.prop(bone, "name", text="Bone Name")
-        layout.prop(bone.bone_properties, "tag", text="BoneTag")
+        layout.prop(bone.bone_properties, "tag")
+        layout.separator()
 
         layout.label(text="Flags")
-        layout.template_list("SOLLUMZ_UL_BONE_FLAGS", "Flags",
-                             bone.bone_properties, "flags", bone.bone_properties, "ul_index")
         row = layout.row()
-        row.operator("sollumz.bone_flags_new_item", text="New")
-        row.operator("sollumz.bone_flags_delete_item", text="Delete")
+        row.template_list("SOLLUMZ_UL_BONE_FLAGS", "Flags",
+                          bone.bone_properties, "flags", bone.bone_properties, "ul_index")
+        col = row.column(align=True)
+        col.operator("sollumz.bone_flags_new_item", text="", icon="ADD")
+        col.operator("sollumz.bone_flags_delete_item", text="", icon="REMOVE")
 
 
 class SOLLUMZ_PT_TXTPARAMS_PANEL(bpy.types.Panel):
