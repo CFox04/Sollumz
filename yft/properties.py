@@ -166,14 +166,6 @@ class LODLevels(bpy.types.PropertyGroup):
         self.add_lod(LODLevel.LOW)
         self.add_lod(LODLevel.VERYLOW)
 
-    # def rename_meshes(self, obj_name: str):
-    #     """Rename meshes to <obj_name>_<lod_level>"""
-    #     for lod in self.lods:
-    #         if lod.mesh is None:
-    #             continue
-    #         lod_level = SOLLUMZ_UI_NAMES[lod.type].lower().replace(' ', '_')
-    #         lod.mesh.name = f"{obj_name}_{lod_level}"
-
     @property
     def active_lod(self) -> Union[ObjectLODProps, None]:
         if self.active_lod_index < len(self.lods):

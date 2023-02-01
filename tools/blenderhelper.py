@@ -1,4 +1,5 @@
 import bpy
+import re
 from mathutils import Vector
 
 from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
@@ -6,7 +7,12 @@ from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
 
 def remove_number_suffix(string: str):
     """Remove the .00# at that Blender puts at the end of object names."""
-    return string.split(".")[0]
+    match = re.search(".[0-9]", string)
+
+    if match is None:
+        return string
+
+    return string[:match.start()]
 
 
 def create_brush(name):

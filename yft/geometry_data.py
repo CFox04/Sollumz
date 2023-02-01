@@ -1,3 +1,4 @@
+"""Intermediate data structures for parsing Drawable geometry data"""
 import bpy
 from mathutils import Vector
 from traceback import format_exc
@@ -9,9 +10,14 @@ from ..cwxml.drawable import BoneItem
 from .. import logger
 
 
+def split_indices(indices: list[int]) -> list[tuple[int, int, int]]:
+    """Split list of indices into groups of 3."""
+    return (tuple(indices[i:i + 3]) for i in range(0, len(indices), 3))
+
+
 @dataclass(frozen=True)
 class VertexAttributes:
-    # TODO: Integrate directly with xml class
+    # TODO: Integrate directly with xml class (from_vertex wont be needed)
     position: tuple[float, float, float]
     normal: tuple[float, float, float]
     uv: tuple[tuple[float, float]]
@@ -61,6 +67,7 @@ class GeometryData:
     vertices: list[Vector] = field(default_factory=list)
     normals: list[Vector] = field(default_factory=list)
     faces: list[Face] = field(default_factory=list)
+    # Material indices are mapped to faces
     material_indices: list[int] = field(default_factory=list)
     uv: dict[int, list[Vector2]] = field(
         default_factory=lambda: defaultdict(list))
@@ -85,11 +92,26 @@ class GeometryData:
         for bone_index, weight in vert_attrs.weights.items():
             self.vertex_groups[bone_index].append((vert_index, weight))
 
-    def create_geometry_mesh(self, name: str, materials: list[bpy.types.Material]):
+    def add_faces(self, indices: list[int], shader_index: int):
+        for face in split_indices(indices):
+            self.faces.append(face)
+            self.material_indices.append(shader_index)
+
+    def add_vertices(self, vertices: list[VertexAttributes]):
+        for vertex in vertices:
+            self.add_vertex(vertex)
+
+
+class MeshBuilder:
+    def __init__(self, geometry_data: GeometryData):
+        self.geometry_data = geometry_data
+
+    def build(self, name: str, materials: list[bpy.types.Material]):
         mesh = bpy.data.meshes.new(name)
 
         try:
-            mesh.from_pydata(self.vertices, [], self.faces)
+            mesh.from_pydata(self.geometry_data.vertices,
+                             [], self.geometry_data.faces)
         except Exception:
             logger.error(
                 f"Error during creation of fragment {name}:\n{format_exc()}\nEnsure the mesh data is not malformed.")
@@ -107,15 +129,15 @@ class GeometryData:
     def set_mesh_normals(self, mesh: bpy.types.Mesh):
         mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
         mesh.normals_split_custom_set_from_vertices(
-            [Vector(normal).normalized() for normal in self.normals])
+            [Vector(normal).normalized() for normal in self.geometry_data.normals])
         mesh.use_auto_smooth = True
 
     def set_mesh_uvs(self, mesh: bpy.types.Mesh):
-        for i, coords in self.uv.items():
+        for i, coords in self.geometry_data.uv.items():
             create_uv_layer(mesh, i, coords)
 
     def set_mesh_vertex_colors(self, mesh: bpy.types.Mesh):
-        for i, colors in self.colors.items():
+        for i, colors in self.geometry_data.colors.items():
             create_vertexcolor_layer(mesh, i, colors)
 
     def create_mesh_materials(self, mesh: bpy.types.Mesh, frag_materials: list[bpy.types.Material]):
@@ -123,7 +145,7 @@ class GeometryData:
         mat_indices: dict[int, int] = {}
 
         for i, polygon in enumerate(mesh.polygons):
-            frag_mat_index = self.material_indices[i]
+            frag_mat_index = self.geometry_data.material_indices[i]
 
             if frag_mat_index not in mat_indices:
                 mat = frag_materials[frag_mat_index]
@@ -143,7 +165,7 @@ class GeometryData:
         # allow the remaining bones to be acquired later if need be.
         bone_ids = bone_ids or []
 
-        for bone_index in self.vertex_groups.keys():
+        for bone_index in self.geometry_data.vertex_groups.keys():
             bone_name = "UNKNOWN_BONE"
 
             if bones and bone_index < len(bones):
@@ -157,6 +179,6 @@ class GeometryData:
 
     def set_geometry_weights(self, obj: bpy.types.Object):
         """Set weights for this geometry."""
-        for i, vertex_group in enumerate(self.vertex_groups.values()):
+        for i, vertex_group in enumerate(self.geometry_data.vertex_groups.values()):
             for vertex_index, weight in vertex_group:
                 obj.vertex_groups[i].add([vertex_index], weight, "ADD")

@@ -2,11 +2,11 @@ import os
 import bpy
 from traceback import format_exc
 from mathutils import Matrix, Vector
-from typing import Dict, Union, Optional
+from typing import Optional
 from ..tools.blenderhelper import create_empty_object, material_from_image, create_mesh_object, remove_number_suffix
 from ..tools.meshhelper import create_uv_layer
 from ..tools.utils import multiply_homogeneous
-from ..sollumz_properties import SollumType, SollumzImportSettings, LODLevel, SOLLUMZ_UI_NAMES
+from ..sollumz_properties import SollumType, SollumzImportSettings, LODLevel
 from ..cwxml.fragment import YFT, Fragment, LODProperty, GroupItem, ChildrenItem, WindowItem
 from ..cwxml.drawable import Drawable, BoneItem, ShaderGroupProperty
 from ..ydr.ydrimport import shadergroup_to_materials, shader_item_to_material, skeleton_to_obj, rotation_limits_to_obj, create_lights
@@ -14,73 +14,52 @@ from ..ybn.ybnimport import bound_to_obj
 from ..ydr.ydrexport import calculate_bone_tag
 from .. import logger
 from .properties import LODProperties
-from .create_drawable_mesh import create_drawable_mesh, add_armature_constraint
+from .create_drawable_meshes import create_drawable_meshes, create_drawable_meshes_split_by_group, add_armature_constraint, create_joined_mesh
 
 
 def import_yft(filepath: str, import_settings: SollumzImportSettings):
     yft_xml: YFT = YFT.from_xml_file(filepath)
 
-    hi_xml: YFT | None = None
-
-    if import_settings.import_with_hi:
-        hi_path = find_hi_yft(filepath)
-
-        if os.path.exists(hi_path):
-            # Only the drawable is needed
-            hi_xml = YFT.from_xml_file(hi_path)
-        else:
-            logger.warning(
-                f"Could not find _hi yft for {os.path.basename(filepath)}! Make sure there is a file named '{os.path.basename(hi_path)}' in the same directory!")
+    hi_xml: YFT | None = parse_hi_yft(
+        filepath) if import_settings.import_with_hi else None
 
     create_fragment_obj(yft_xml, filepath,
                         split_by_group=import_settings.split_by_group, hi_xml=hi_xml)
 
 
-def find_hi_yft(yft_filepath: str) -> str or None:
+def parse_hi_yft(yft_filepath: str) -> Fragment | None:
+    """Parse hi_yft at the provided non_hi yft filepath (if it exists)."""
     yft_dir = os.path.dirname(yft_filepath)
     yft_name = os.path.basename(yft_filepath).split(".")[0]
 
     hi_path = os.path.join(yft_dir, f"{yft_name}_hi.yft.xml")
 
-    return hi_path
+    if os.path.exists(hi_path):
+        # Only the drawable is needed
+        return YFT.from_xml_file(hi_path)
+    else:
+        logger.warning(
+            f"Could not find _hi yft for {os.path.basename(yft_filepath)}! Make sure there is a file named '{os.path.basename(hi_path)}' in the same directory!")
 
 
 def create_fragment_obj(frag_xml: Fragment, filepath: str, split_by_group: bool = False, hi_xml: Optional[Fragment] = None):
     frag_obj = create_frag_armature(frag_xml)
-    drawable_xml = frag_xml.drawable
-
     set_fragment_properties(frag_xml, frag_obj)
 
-    materials = None
-    hi_materials = None
-
-    if hi_xml is not None:
-        materials, hi_materials = create_materials_with_hi(
-            drawable_xml.shader_group, hi_xml.drawable.shader_group, filepath)
-        rename_materials(hi_materials)
-    else:
-        materials: list[bpy.types.Material] = shadergroup_to_materials(
-            frag_xml.drawable.shader_group, filepath)
-        rename_materials(materials)
-
-    mesh_empty = create_empty_object(SollumType.NONE, f"{frag_obj.name}.mesh")
-    mesh_empty.parent = frag_obj
-
-    mesh_objs = create_drawable_mesh(drawable_xml, materials, frag_obj,
-                                     mesh_empty, split_by_group)
-
-    if hi_xml is not None:
-        hi_mesh_objs = create_drawable_mesh(hi_xml.drawable, hi_materials,
-                                            frag_obj, mesh_empty, split_by_group)
-        create_very_high_lods(mesh_objs, hi_mesh_objs)
+    mesh_objs, materials, hi_materials = create_fragment_meshes(
+        frag_xml, frag_obj, filepath, split_by_group, hi_xml)
+    mesh_parent = parent_mesh_objects(mesh_objs, frag_obj)
 
     create_frag_collisions(frag_xml, frag_obj)
 
-    create_frag_lods(frag_xml, frag_obj)
+    create_phys_lods(frag_xml, frag_obj)
     set_all_bone_physics_properties(frag_obj.data, frag_xml)
-    create_frag_child_meshes(
-        frag_xml, frag_obj, mesh_empty, materials, hi_materials, hi_xml)
-    create_vehicle_windows(frag_xml, frag_obj, materials)
+
+    create_phys_child_meshes(
+        frag_xml, frag_obj, mesh_parent, materials, hi_materials, hi_xml)
+
+    if frag_xml.vehicle_glass_windows:
+        create_vehicle_windows(frag_xml, frag_obj, materials)
 
     if frag_xml.lights:
         lights_parent = create_lights(frag_xml.lights, frag_obj, frag_obj)
@@ -88,6 +67,7 @@ def create_fragment_obj(frag_xml: Fragment, filepath: str, split_by_group: bool 
 
 
 def create_frag_armature(frag_xml: Fragment):
+    """Create the fragment armature along with the bones and rotation limits."""
     name = frag_xml.name.replace("pack:/", "")
     skel = bpy.data.armatures.new(f"{name}.skel")
     frag_obj = create_mesh_object(SollumType.FRAGMENT, name, skel)
@@ -98,54 +78,34 @@ def create_frag_armature(frag_xml: Fragment):
     return frag_obj
 
 
-def create_materials_with_hi(shader_group: ShaderGroupProperty, hi_shader_group: ShaderGroupProperty, filepath: str):
-    """Returns a list of non_hi and a list of _hi materials."""
-    # The hi model will always contain more shaders than the non hi model, so we create those materials first
-    hi_materials: list[bpy.types.Material] = shadergroup_to_materials(
-        hi_shader_group, filepath)
-    non_hi_materials: list[bpy.types.Material] = []
-    non_hi_index = 0
+def create_fragment_meshes(frag_xml: Fragment, frag_obj: bpy.types.Object, filepath: str, split_by_group: bool = False, hi_xml: Optional[Fragment] = None):
+    """Create all fragment mesh objects. Returns a list of mesh objects, a list of materials, and a list of hi_materials."""
+    materials: list[bpy.types.Material] = shadergroup_to_materials(
+        frag_xml.drawable.shader_group, filepath)
+    rename_materials(materials)
 
-    # Now we add the corresponding non_hi shaders to the non_hi_materials list
-    for i, shader in enumerate(hi_shader_group.shaders):
-        if non_hi_index >= len(shader_group.shaders):
-            break
+    drawable_xml = frag_xml.drawable
 
-        if shader_group.shaders[non_hi_index].name != shader.name:
-            continue
+    mesh_objs = (
+        create_drawable_meshes(drawable_xml, materials, frag_obj)
+        if not split_by_group
+        else create_drawable_meshes_split_by_group(drawable_xml, materials, frag_obj)
+    )
 
-        non_hi_materials.append(hi_materials[i])
-        non_hi_index += 1
+    hi_materials = []
 
-    # Sometimes, the non_hi model will also contain shaders that the hi model does not have, so we need to add those as well.
-    if len(non_hi_materials) < len(shader_group.shaders):
-        for shader in shader_group.shaders[non_hi_index:]:
-            non_hi_materials.append(shader_item_to_material(
-                shader, shader_group, filepath))
+    if hi_xml is not None:
+        hi_materials = create_hi_materials(
+            materials, frag_xml.drawable.shader_group, hi_xml.drawable.shader_group, filepath)
 
-    return non_hi_materials, hi_materials
+        hi_mesh_objs = (
+            create_drawable_meshes(hi_xml.drawable, hi_materials, frag_obj)
+            if not split_by_group
+            else create_drawable_meshes_split_by_group(hi_xml.drawable, hi_materials, frag_obj)
+        )
+        set_hi_lods(mesh_objs, hi_mesh_objs)
 
-
-def create_very_high_lods(mesh_objs: list[bpy.types.Object], hi_mesh_objs: list[bpy.types.Object]):
-    """Add the hi_meshes to the very high LOD level of each corresponding non_hi_mesh."""
-    hi_meshes_by_name: dict[str, bpy.types.Object] = {
-        remove_number_suffix(obj.name): obj for obj in hi_mesh_objs}
-
-    for mesh in mesh_objs:
-        mesh_name = remove_number_suffix(mesh.name)
-
-        if mesh_name not in hi_meshes_by_name:
-            continue
-
-        hi_mesh = hi_meshes_by_name[mesh_name]
-        hi_mesh.data.name = f"{mesh_name}_very_high"
-        mesh.sollumz_object_lods.set_lod_mesh(LODLevel.VERYHIGH, hi_mesh.data)
-        mesh.sollumz_object_lods.set_active_lod(LODLevel.VERYHIGH)
-
-        bpy.data.objects.remove(hi_mesh)
-
-        # In case a .00# suffix got added
-        mesh.name = mesh_name
+    return mesh_objs, materials, hi_materials
 
 
 def rename_materials(materials: list[bpy.types.Material]):
@@ -159,7 +119,62 @@ def rename_materials(materials: list[bpy.types.Material]):
             break
 
 
-def create_frag_lods(frag_xml: Fragment, frag_obj: bpy.types.Object):
+def create_hi_materials(non_hi_materials: list[bpy.types.Material], shader_group: ShaderGroupProperty, hi_shader_group: ShaderGroupProperty, filepath: str):
+    """Create the _hi materials. Returns a list with the hi materials and non_hi_materials merged."""
+    hi_materials: list[bpy.types.Material] = []
+    non_hi_index = 0
+
+    # Loop through hi shaders and compare with non_hi shaders each iteration. If the hi_shader and non_hi shader are the same,
+    # add the already created non_hi material to hi_materials. Otherwise create the hi material and add it to hi_materials.
+    for shader in hi_shader_group.shaders:
+        if non_hi_index >= len(shader_group.shaders) or shader_group.shaders[non_hi_index].name != shader.name:
+            hi_mat = shader_item_to_material(shader, hi_shader_group, filepath)
+            hi_materials.append(hi_mat)
+
+            continue
+
+        hi_materials.append(non_hi_materials[non_hi_index])
+        non_hi_index += 1
+
+    return hi_materials
+
+
+def set_hi_lods(mesh_objs: list[bpy.types.Object], hi_mesh_objs: list[bpy.types.Object]):
+    """Add the hi_meshes to the very high LOD level of each corresponding non_hi_mesh. Deletes all hi_mesh_objs."""
+    hi_meshes_by_name: dict[str, bpy.types.Object] = {
+        remove_number_suffix(obj.name): obj for obj in hi_mesh_objs}
+
+    for obj in mesh_objs:
+        obj_name = remove_number_suffix(obj.name)
+
+        if obj_name not in hi_meshes_by_name:
+            continue
+
+        hi_mesh = hi_meshes_by_name[obj_name]
+        hi_mesh.data.name = f"{obj_name}_very_high"
+        obj.sollumz_object_lods.set_lod_mesh(LODLevel.VERYHIGH, hi_mesh.data)
+        obj.sollumz_object_lods.set_active_lod(LODLevel.VERYHIGH)
+
+        bpy.data.objects.remove(hi_mesh)
+
+        # In case a .00# suffix got added
+        obj.name = obj_name
+
+
+def parent_mesh_objects(mesh_objs: list[bpy.types.Object], frag_obj: bpy.types.Object):
+    """Parent all mesh objects to an empty which is parented to the fragment object."""
+    mesh_empty = create_empty_object(
+        SollumType.NONE, f"{frag_obj.name}.mesh")
+    mesh_empty.parent = frag_obj
+
+    for obj in mesh_objs:
+        obj.parent = mesh_empty
+
+    return mesh_empty
+
+
+def create_phys_lods(frag_xml: Fragment, frag_obj: bpy.types.Object):
+    """Create the Fragment.Physics.LOD1 data-block. (Currently LOD1 is only supported)"""
     for i, lod_xml in frag_xml.get_lods_by_id().items():
         if not lod_xml.groups:
             continue
@@ -188,19 +203,7 @@ def drawable_is_empty(drawable: Drawable):
     return len(drawable.all_models) == 0
 
 
-def get_child_transforms(lod_xml: LODProperty, child_index: int) -> Matrix:
-    transform = lod_xml.transforms[child_index].value
-    a = transform[3][0] + lod_xml.position_offset.x
-    b = transform[3][1] + lod_xml.position_offset.y
-    c = transform[3][2] + lod_xml.position_offset.z
-    transform[3][0] = a
-    transform[3][1] = b
-    transform[3][2] = c
-
-    return transform.transposed()
-
-
-def create_frag_collisions(frag_xml: Fragment, frag_obj: bpy.types.Object) -> Union[bpy.types.Object, None]:
+def create_frag_collisions(frag_xml: Fragment, frag_obj: bpy.types.Object) -> bpy.types.Object | None:
     bounds_xml = frag_xml.physics.lod1.archetype.bounds
 
     if bounds_xml is None:
@@ -225,7 +228,7 @@ def create_frag_collisions(frag_xml: Fragment, frag_obj: bpy.types.Object) -> Un
         bound_obj.child_properties.mass = frag_xml.physics.lod1.children[i].pristine_mass
 
 
-def find_bound_bone(bound_index: int, frag_xml: Fragment) -> Union[BoneItem, None]:
+def find_bound_bone(bound_index: int, frag_xml: Fragment) -> BoneItem | None:
     """Get corresponding bound bone based on children"""
     children = frag_xml.physics.lod1.children
 
@@ -240,21 +243,19 @@ def find_bound_bone(bound_index: int, frag_xml: Fragment) -> Union[BoneItem, Non
         return bone
 
 
-def create_frag_child_meshes(frag_xml: Fragment, frag_obj: bpy.types.Object, parent_obj: bpy.types.Object, materials: list[bpy.types.Material], hi_materials: Optional[list[bpy.types.Material]], hi_xml: Optional[Fragment] = None):
+def create_phys_child_meshes(frag_xml: Fragment, frag_obj: bpy.types.Object, mesh_parent: bpy.types.Object, materials: list[bpy.types.Material], hi_materials: Optional[list[bpy.types.Material]] = None, hi_xml: Optional[Fragment] = None):
+    """Create all Fragment.Physics.LOD1.Children meshes. (Only LOD1 currently supported)"""
     lod_xml = frag_xml.physics.lod1
     children_xml: list[ChildrenItem] = lod_xml.children
-    hi_children: list[ChildrenItem] = hi_xml.physics.lod1.children if hi_xml else []
     bones = frag_xml.drawable.skeleton.bones
 
     bone_name_by_tag: dict[str, BoneItem] = {
         bone.tag: bone.name for bone in bones}
 
-    for i, child_xml in enumerate(children_xml):
-        group_index = child_xml.group_index
+    child_meshes: list[bpy.types.Object] = []
 
-        if group_index >= len(lod_xml.groups):
-            logger.warning(
-                "A fragment child has an invalid group index! Skipping...")
+    for i, child_xml in enumerate(children_xml):
+        if drawable_is_empty(child_xml.drawable):
             continue
 
         if child_xml.bone_tag not in bone_name_by_tag:
@@ -264,39 +265,43 @@ def create_frag_child_meshes(frag_xml: Fragment, frag_obj: bpy.types.Object, par
 
         bone_name = bone_name_by_tag[child_xml.bone_tag]
 
-        if drawable_is_empty(child_xml.drawable):
-            continue
+        child_obj = create_phys_child_mesh(
+            child_xml.drawable, frag_obj, materials, bone_name)
 
-        child_obj = create_drawable_mesh(
-            child_xml.drawable, materials, frag_obj, parent_obj)[0]
-        add_armature_constraint(child_obj, frag_obj, bone_name)
-        child_obj.name = f"{bone_name}.child"
-        child_obj.is_physics_child_mesh = True
+        if hi_xml is not None and hi_materials is not None:
+            hi_children: list[ChildrenItem] = hi_xml.physics.lod1.children
+            hi_drawable = hi_children[i].drawable
+            create_frag_child_hi_lod(
+                bone_name, child_obj, hi_drawable, hi_materials)
 
-        if hi_children:
-            child_hi_obj = create_drawable_mesh(
-                hi_children[i].drawable, hi_materials, frag_obj, parent_obj)[0]
-            child_hi_obj.data.name = f"{bone_name}_very_high"
+        child_obj.parent = mesh_parent
 
-            child_obj.sollumz_object_lods.set_lod_mesh(
-                LODLevel.VERYHIGH, child_hi_obj.data)
-            child_obj.sollumz_object_lods.set_active_lod(LODLevel.VERYHIGH)
+    return child_meshes
 
-            bpy.data.objects.remove(child_hi_obj)
 
-        # Rename lod meshes
-        for lod in child_obj.sollumz_object_lods.lods:
-            if lod.mesh is None:
-                continue
-            lod_level_name = SOLLUMZ_UI_NAMES[lod.type].lower().replace(
-                ' ', '_')
-            lod.mesh.name = f"{bone_name}_{lod_level_name}"
+def create_phys_child_mesh(drawable_xml: Drawable, frag_obj: bpy.types.Object, materials: list[bpy.types.Material], bone_name: str):
+    """Create a single physics child mesh"""
+    child_obj = create_joined_mesh(drawable_xml, materials)
+    add_armature_constraint(child_obj, frag_obj, bone_name)
+    child_obj.name = f"{bone_name}.child"
+    child_obj.is_physics_child_mesh = True
+
+    return child_obj
+
+
+def create_frag_child_hi_lod(name: str, child_obj: bpy.types.Object, hi_drawable: Drawable, hi_materials: list[bpy.types.Material]):
+    """Create hi lod for a physics child mesh"""
+    child_hi_obj = create_joined_mesh(hi_drawable, hi_materials)
+    child_hi_obj.data.name = f"{name}_very_high"
+
+    child_obj.sollumz_object_lods.set_lod_mesh(
+        LODLevel.VERYHIGH, child_hi_obj.data)
+    child_obj.sollumz_object_lods.set_active_lod(LODLevel.VERYHIGH)
+
+    bpy.data.objects.remove(child_hi_obj)
 
 
 def create_vehicle_windows(frag_xml: Fragment, frag_obj: bpy.types.Object, materials: list[bpy.types.Material]):
-    if not frag_xml.vehicle_glass_windows:
-        return
-
     veh_windows_empty = create_empty_object(
         SollumType.NONE, f"{frag_obj.name}.glass_shards")
     veh_windows_empty.parent = frag_obj
@@ -305,46 +310,54 @@ def create_vehicle_windows(frag_xml: Fragment, frag_obj: bpy.types.Object, mater
     for window_xml in frag_xml.vehicle_glass_windows:
         window_bone = get_window_bone(
             window_xml, frag_xml, frag_obj.data.bones)
-        window_location = window_bone.matrix_local.translation
 
         window_name = f"{window_bone.name}_glass_shard"
 
         try:
             mesh = create_vehicle_window_mesh(
-                window_xml, window_name, window_bone.matrix_local)
+                window_xml, window_name, window_bone.matrix_local.translation)
         except:
             logger.error(
                 f"Error during creation of vehicle window mesh:\n{format_exc()}")
             continue
-
-        texcoords = [[0, 1], [0, 0], [1, 0], [1, 1]]
-        create_uv_layer(mesh, 0, texcoords, flip_uvs=False)
 
         if window_xml.shattermap:
             shattermap_mat = shattermap_to_material(
                 window_xml.shattermap, mesh.name + "_shattermap.bmp")
             mesh.materials.append(shattermap_mat)
 
-        # UnkUShort1 indexes the geometry that the window uses.
-        # The VehicleGlassWindow uses the same material that the geometry uses.
-        geometry_index = window_xml.unk_ushort_1
-        window_mat = get_geometry_material(frag_xml, materials, geometry_index)
-        mesh.materials.append(window_mat)
+        add_veh_window_material(window_xml, frag_xml.drawable, materials, mesh)
 
-        window_obj = bpy.data.objects.new(mesh.name, mesh)
-        window_obj.sollum_type = SollumType.FRAGVEHICLEWINDOW
-
-        window_obj.location = window_location
-        add_armature_constraint(window_obj, frag_obj,
-                                window_bone.name, set_transforms=False)
-
-        set_veh_window_properties(window_xml, window_obj)
-
-        bpy.context.collection.objects.link(window_obj)
+        window_obj = create_veh_window_object(
+            frag_obj, window_xml, window_bone, mesh)
         window_obj.parent = veh_windows_empty
 
 
+def add_veh_window_material(window_xml: WindowItem, drawable_xml: Drawable, materials: list[bpy.types.Material], mesh: bpy.types.Mesh):
+    """Add material to vehicle window based on UnkUShort1."""
+    # UnkUShort1 indexes the geometry that the window uses.
+    # The VehicleGlassWindow uses the same material that the geometry uses.
+    geometry_index = window_xml.unk_ushort_1
+    window_mat = get_geometry_material(drawable_xml, materials, geometry_index)
+    mesh.materials.append(window_mat)
+
+
+def create_veh_window_object(frag_obj: bpy.types.Object, window_xml: WindowItem, window_bone: bpy.types.Bone, mesh: bpy.types.Mesh):
+    window_obj = bpy.data.objects.new(mesh.name, mesh)
+    window_obj.sollum_type = SollumType.FRAGVEHICLEWINDOW
+
+    window_obj.location = window_bone.matrix_local.translation
+    add_armature_constraint(window_obj, frag_obj,
+                            window_bone.name, set_transforms=False)
+    set_veh_window_properties(window_xml, window_obj)
+
+    bpy.context.collection.objects.link(window_obj)
+
+    return window_obj
+
+
 def get_window_bone(window_xml: WindowItem, frag_xml: Fragment, bpy_bones: bpy.types.ArmatureBones) -> bpy.types.Bone:
+    """Get bone connected to window based on the bone tag of the physics child associated with the window."""
     children_xml: list[ChildrenItem] = frag_xml.physics.lod1.children
 
     child_id: int = window_xml.item_id
@@ -360,18 +373,20 @@ def get_window_bone(window_xml: WindowItem, frag_xml: Fragment, bpy_bones: bpy.t
 
         return bone
 
+    # Return root bone if no bone is found
     return bpy_bones[0]
 
 
-def create_vehicle_window_mesh(window_xml: WindowItem, name: str, child_matrix: Matrix):
+def create_vehicle_window_mesh(window_xml: WindowItem, name: str, window_location: Vector):
     verts = calculate_window_verts(window_xml)
-    # verts = [(vert - child_matrix.translation) @ child_matrix
-    #          for vert in verts]
     faces = [[0, 1, 2, 3]]
 
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts, [], faces)
-    mesh.transform(Matrix.Translation(-child_matrix.translation))
+    mesh.transform(Matrix.Translation(-window_location))
+
+    texcoords = [[0, 1], [0, 0], [1, 0], [1, 1]]
+    create_uv_layer(mesh, 0, texcoords, flip_uvs=False)
 
     return mesh
 
@@ -433,9 +448,9 @@ def shattermap_to_material(shattermap, name):
     return material_from_image(img, name, "ShatterMap")
 
 
-def get_geometry_material(frag_xml: Fragment, materials: list[bpy.types.Material], geometry_index: int) -> Union[bpy.types.Material, None]:
+def get_geometry_material(drawable_xml: Drawable, materials: list[bpy.types.Material], geometry_index: int) -> bpy.types.Material | None:
     """Get the material that the given geometry uses."""
-    for dmodel in frag_xml.drawable.drawable_models_high:
+    for dmodel in drawable_xml.drawable_models_high:
         geometries = dmodel.geometries
 
         if geometry_index > len(geometries):

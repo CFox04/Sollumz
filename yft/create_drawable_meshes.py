@@ -1,102 +1,96 @@
 import bpy
-from typing import Dict, NamedTuple
+from typing import Dict, Optional
 from collections import defaultdict
 from ..tools.blenderhelper import create_mesh_object
 from ..cwxml.drawable import GeometryItem, Drawable, BoneItem
 from ..sollumz_properties import LODLevel, SollumType, SOLLUMZ_UI_NAMES
-from .geometry_data import GeometryData, VertexAttributes
+from .geometry_data import GeometryData, VertexAttributes, MeshBuilder, split_indices
 from .properties import LODLevels
-from .. import logger
+
+# TODO: Make ydr use this module
 
 LODsByGroup = Dict[str, dict[LODLevel, GeometryData]]
 GeomDataByBone = Dict[int, dict[LODLevel, GeometryData]]
 GeomsByBone = Dict[int, dict[LODLevel, list[GeometryItem]]]
 
 
-def create_drawable_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], armature_obj: bpy.types.Object, parent_obj: bpy.types.Object, split_by_group=False):
+def create_drawable_meshes(drawable_xml: Drawable, materials: list[bpy.types.Material], drawable_obj: bpy.types.Object):
     """Create fragment mesh joining all skinned geometries. Any non-skinned meshes will be split and parented to their corresponding bone. Returns all mesh objects."""
     bones: list[BoneItem] = drawable_xml.skeleton.bones
 
     if not bones:
         joined_geom = create_joined_mesh(
-            drawable_xml, materials, armature_obj, parent_obj)
+            drawable_xml, materials, drawable_obj.name)
         return [joined_geom]
 
-    skinned_geoms: list[bpy.types.Object] = []
-
-    if split_by_group:
-        skinned_geoms = create_split_drawable_mesh(
-            drawable_xml, materials, armature_obj, parent_obj)
-    else:
-        skinned_geoms = create_skinned_drawable_mesh(
-            drawable_xml, materials, armature_obj, parent_obj)
+    skinned_geom = create_skinned_drawable_mesh(
+        drawable_xml, materials, drawable_obj)
 
     non_skinned_geoms = create_non_skinned_drawable_mesh(
-        drawable_xml, materials, armature_obj, parent_obj)
+        drawable_xml, materials, drawable_obj)
+
+    return [skinned_geom, *non_skinned_geoms]
+
+
+def create_drawable_meshes_split_by_group(drawable_xml: Drawable, materials: list[bpy.types.Material], drawable_obj: bpy.types.Object):
+    """Create fragment mesh split by vertex groups. Any non-skinned meshes will be split and parented to their corresponding bone. Returns all mesh objects."""
+    bones: list[BoneItem] = drawable_xml.skeleton.bones
+
+    if not bones:
+        return create_drawable_meshes(drawable_xml, materials, drawable_obj)
+
+    skinned_geoms = create_split_drawable_mesh(
+        drawable_xml, materials, drawable_obj)
+
+    non_skinned_geoms = create_non_skinned_drawable_mesh(
+        drawable_xml, materials, drawable_obj)
 
     return skinned_geoms + non_skinned_geoms
 
 
-def create_joined_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], armature_obj: bpy.types.Object, parent_obj: bpy.types.Object):
+def create_joined_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], name: Optional[str] = None):
     """Create a joined mesh from the drawable. This will break any rigging, so only use on drawables with no skeleton."""
     geometry_data_by_lod = get_joined_geometry_data(drawable_xml)
-    name = f"{armature_obj.name}.mesh_object"
+    geom_name = f"{name or drawable_xml.name}.mesh_object"
     bones: list[BoneItem] = drawable_xml.skeleton.bones
 
     geom = create_drawable_geometry(
-        name, geometry_data_by_lod, materials, bones)
-    geom.parent = parent_obj
+        geom_name, geometry_data_by_lod, materials, bones)
 
     return geom
 
 
-def ensure_bones(func):
-    """Decorator to ensure drawable has bones and warn if not. Function must take in drawable_xml as first argument."""
-    def inner(drawable_xml: Drawable, *args):
-        if not drawable_xml.skeleton.bones:
-            logger.warning(
-                f"Cannot create a rigged mesh from drawable '{drawable_xml.name}': Drawable contains no bones! Aborting...")
-            return
-        return func(drawable_xml, *args)
-
-    return inner
-
-
-@ensure_bones
-def create_skinned_drawable_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], armature_obj: bpy.types.Object, parent_obj: bpy.types.Object):
+def create_skinned_drawable_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], drawable_obj: bpy.types.Object):
     """Create the skinned portion of the mesh (parts of mesh with vertex groups)."""
-    bones: list[BoneItem] = drawable_xml.skeleton.bones
-
     skinned_geometry_data = get_joined_geometry_data(
         drawable_xml, only_skinned=True)
+    name = f"{drawable_obj.name}.mesh_object"
+    bones: list[BoneItem] = drawable_xml.skeleton.bones
+
     geom = create_drawable_geometry(
-        bones[0].name, skinned_geometry_data, materials, bones)
-    geom.parent = parent_obj
-    add_armature_modifier(geom, armature_obj)
+        name, skinned_geometry_data, materials, bones)
+    add_armature_modifier(geom, drawable_obj)
 
     return geom
 
 
-@ensure_bones
-def create_split_drawable_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], armature_obj: bpy.types.Object, parent_obj: bpy.types.Object):
+def create_split_drawable_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], drawable_obj: bpy.types.Object):
     """Create skinned portion of mesh split by vertex groups."""
-    grouped_geometry_data = get_split_geom_data(drawable_xml)
+    grouped_geometry_data = group_drawable_geometries(drawable_xml)
     bones: list[BoneItem] = drawable_xml.skeleton.bones
 
     geoms: list[bpy.types.Object] = []
 
     for name, data_by_lod in grouped_geometry_data.items():
         geom = create_drawable_geometry(name, data_by_lod, materials, bones)
-        geom.parent = parent_obj
-        add_armature_modifier(geom, armature_obj)
+        add_armature_modifier(geom, drawable_obj)
 
         geoms.append(geom)
 
     return geoms
 
 
-@ensure_bones
-def create_non_skinned_drawable_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], armature_obj: bpy.types.Object, parent_obj: bpy.types.Object):
+def create_non_skinned_drawable_mesh(drawable_xml: Drawable, materials: list[bpy.types.Material], drawable_obj: bpy.types.Object):
     """Create the non skinned parts of the fragment mesh. These objects are separated by drawable model so they can be parented to their bone."""
     non_skinned_geometry_data = create_non_skinned_geometry_data(
         drawable_xml)
@@ -108,8 +102,7 @@ def create_non_skinned_drawable_mesh(drawable_xml: Drawable, materials: list[bpy
         bone_name = bones[bone_index].name
         geom = create_drawable_geometry(
             bone_name, data_by_lod, materials, bones)
-        geom.parent = parent_obj
-        add_armature_constraint(geom, armature_obj, bone_name)
+        add_armature_constraint(geom, drawable_obj, bone_name)
 
         geoms.append(geom)
 
@@ -117,6 +110,7 @@ def create_non_skinned_drawable_mesh(drawable_xml: Drawable, materials: list[bpy
 
 
 def create_drawable_geometry(name: str, geometry_data_by_lod: dict[LODLevel, GeometryData], materials: list[bpy.types.Material], bones: list[BoneItem]):
+    """Create a single drawable geometry object. Requires a mapping of GeometryData to LODLevel."""
     geom: bpy.types.Object = create_mesh_object(SollumType.FRAG_GEOM, name)
     lod_levels: LODLevels = geom.sollumz_object_lods
     original_mesh = geom.data
@@ -125,12 +119,14 @@ def create_drawable_geometry(name: str, geometry_data_by_lod: dict[LODLevel, Geo
 
     for lod_level, geometry_data in geometry_data_by_lod.items():
         mesh_name = f"{name}_{SOLLUMZ_UI_NAMES[lod_level].lower().replace(' ', '_')}"
-        lod_mesh = geometry_data.create_geometry_mesh(mesh_name, materials)
+
+        mesh_builder = MeshBuilder(geometry_data)
+        lod_mesh = mesh_builder.build(mesh_name, materials)
 
         lod_levels.set_lod_mesh(lod_level, lod_mesh)
         lod_levels.set_active_lod(lod_level)
 
-        geometry_data.create_vertex_groups(geom, bones)
+        mesh_builder.create_vertex_groups(geom, bones)
 
     lod_levels.set_active_lod(LODLevel.HIGH)
 
@@ -158,14 +154,14 @@ def get_joined_geometry_data(drawable: Drawable, only_skinned=False):
     geometries_by_lod = group_geometries_by_lod(drawable, only_skinned)
 
     for lod_level, geometries in geometries_by_lod.items():
-        geom_data = join_geometries(geometries)
+        geom_data = create_geometry_data_from_geometries(geometries)
         grouped_geometry_data[lod_level] = geom_data
 
     return grouped_geometry_data
 
 
-def join_geometries(geometries: list[GeometryItem]):
-    """Joins all geometries into one GeometryData object."""
+def create_geometry_data_from_geometries(geometries: list[GeometryItem]):
+    """Creates a single GeometryData object for all geometries."""
     verts_by_shader, ind_by_shader = get_vertex_data_by_shader_index(
         geometries)
     geom_data = GeometryData()
@@ -173,18 +169,14 @@ def join_geometries(geometries: list[GeometryItem]):
     for shader_index, indices in ind_by_shader.items():
         num_verts = len(geom_data.vertices)
 
-        for face in split_indices(indices):
-            geom_data.faces.append([i + num_verts for i in face])
-            geom_data.material_indices.append(shader_index)
-
-        for vertex in verts_by_shader[shader_index]:
-            geom_data.add_vertex(VertexAttributes.from_vertex(vertex))
+        geom_data.add_faces([i + num_verts for i in indices], shader_index)
+        geom_data.add_vertices(verts_by_shader[shader_index])
 
     return geom_data
 
 
-def get_split_geom_data(drawable: Drawable):
-    """Returns a map of group names to the LOD meshes of each group."""
+def group_drawable_geometries(drawable: Drawable):
+    """Splits drawable geometries by vertex group. Returns a map of group name to LODLevel to GeometryData object(s)."""
     lods_by_group: LODsByGroup = defaultdict(dict)
     geometries_by_lod = group_geometries_by_lod(drawable, only_skinned=True)
     bones: list[BoneItem] = drawable.skeleton.bones
@@ -192,6 +184,8 @@ def get_split_geom_data(drawable: Drawable):
     if not bones:
         return {}
 
+    # In rigged drawables, there will be vertex groups that share the same vertices.
+    # This will find the groups that share vertices and map them to a common parent.
     group_parent_map = get_group_parent_map(
         geometries_by_lod[LODLevel.HIGH], drawable.skeleton.bones)
 
@@ -212,7 +206,7 @@ def create_non_skinned_geometry_data(drawable: Drawable):
 
     for bone_index, lods in geoms_by_bone_ind.items():
         for lod_level, geometries in lods.items():
-            geom_data = join_geometries(geometries)
+            geom_data = create_geometry_data_from_geometries(geometries)
             geom_data_by_model[bone_index][lod_level] = geom_data
 
     return geom_data_by_model
@@ -249,13 +243,11 @@ def create_grouped_geometry_data(geometries: list[GeometryItem], bones: list[Bon
         for group_name, verts in verts_by_group.items():
             geom_data = geom_data_by_group[group_name]
             num_verts = len(geom_data.vertices)
+            group_indices = ind_by_group[group_name]
 
-            for face in split_indices(ind_by_group[group_name]):
-                geom_data.faces.append([i + num_verts for i in face])
-                geom_data.material_indices.append(shader_index)
-
-            for vert_attrs in verts:
-                geom_data.add_vertex(vert_attrs)
+            geom_data.add_faces(
+                [i + num_verts for i in group_indices], shader_index)
+            geom_data.add_vertices(verts)
 
     return geom_data_by_group
 
@@ -274,14 +266,16 @@ def get_vertex_data_by_shader_index(geometries: list[GeometryItem]):
             index_data = [
                 vert_index + len(verts_by_shader[shader_index]) for vert_index in index_data]
 
-        verts_by_shader[shader_index].extend(vertex_data)
+        # TODO: Remove once xml code is merged with GeometryData code
+        verts_by_shader[shader_index].extend(
+            [VertexAttributes.from_vertex(vert) for vert in vertex_data])
         ind_by_shader[shader_index].extend(index_data)
 
     return verts_by_shader, ind_by_shader
 
 
 def get_joined_vertex_data(geometries: list[GeometryItem]):
-    """Returns list of vertices and indices. (vertices, indices)"""
+    """Returns list of vertices and indices of all the geometries. (vertices, indices)"""
     vertices: list[VertexAttributes] = []
     indices: list[int] = []
 
@@ -296,7 +290,7 @@ def get_joined_vertex_data(geometries: list[GeometryItem]):
 
 
 def get_group_parent_map(geometries: list[GeometryItem], bones: list[BoneItem]):
-    """Get the vertex group indices that share the same vertices."""
+    """Get the vertex group indices that share the same vertices. Returns a map of bone index to bone parent index."""
     vertices, indices = get_joined_vertex_data(geometries)
     faces = split_indices(indices)
 
@@ -358,7 +352,7 @@ def get_root_bone_parent_index(bone_index: int, bones: list[BoneItem]) -> int:
     return i
 
 
-def get_vertex_data_by_group(indices: list[int], vertices: list[NamedTuple], bones: list[BoneItem], group_parent_map: dict[int, int] = None):
+def get_vertex_data_by_group(indices: list[int], vertices: list[VertexAttributes], bones: list[BoneItem], group_parent_map: dict[int, int] = None):
     """Returns the given indices and vertices mapped by vertex group."""
     ind_by_group: dict[str, list[int]] = defaultdict(list)
     verts_by_group: dict[str, list[VertexAttributes]] = defaultdict(list)
@@ -369,15 +363,15 @@ def get_vertex_data_by_group(indices: list[int], vertices: list[NamedTuple], bon
     group_parent_map = group_parent_map or {}
 
     for i in indices:
-        vert_attrs = VertexAttributes.from_vertex(vertices[i])
+        vertex = vertices[i]
 
         group_name = get_object_group_name(
-            vert_attrs, bones, group_parent_map)
+            vertex, bones, group_parent_map)
 
         if i not in vert_indices[group_name]:
             group_verts = verts_by_group[group_name]
 
-            group_verts.append(vert_attrs)
+            group_verts.append(vertex)
             new_vert_index = len(group_verts) - 1
 
             vert_indices[group_name][i] = new_vert_index
@@ -404,27 +398,22 @@ def get_object_group_name(vert_attrs: VertexAttributes, bones: list[BoneItem], g
     return bones[first_bone_index].name
 
 
-def add_armature_modifier(obj: bpy.types.Object, armature_obj: bpy.types.Object):
+def add_armature_modifier(obj: bpy.types.Object, drawable_obj: bpy.types.Object):
     mod: bpy.types.ArmatureModifier = obj.modifiers.new("skel", "ARMATURE")
-    mod.object = armature_obj
+    mod.object = drawable_obj
 
     return mod
 
 
-def add_armature_constraint(obj: bpy.types.Object, armature_obj: bpy.types.Object, target_bone: str, set_transforms=True):
+def add_armature_constraint(obj: bpy.types.Object, drawable_obj: bpy.types.Object, target_bone: str, set_transforms=True):
     """Add armature constraint that is used for bone parenting on non-skinned objects."""
     constraint: bpy.types.ArmatureConstraint = obj.constraints.new("ARMATURE")
     target = constraint.targets.new()
-    target.target = armature_obj
+    target.target = drawable_obj
     target.subtarget = target_bone
 
     if not set_transforms:
         return
 
-    bone = armature_obj.data.bones[target_bone]
+    bone = drawable_obj.data.bones[target_bone]
     obj.matrix_local = bone.matrix_local
-
-
-def split_indices(indices: list[int]) -> list[tuple[int, int, int]]:
-    """Split list of indices into groups of 3."""
-    return (tuple(indices[i:i + 3]) for i in range(0, len(indices), 3))
