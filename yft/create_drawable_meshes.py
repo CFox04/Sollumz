@@ -5,7 +5,7 @@ from ..tools.blenderhelper import create_mesh_object
 from ..cwxml.drawable import GeometryItem, Drawable, BoneItem
 from ..sollumz_properties import LODLevel, SollumType, SOLLUMZ_UI_NAMES
 from .geometry_data import GeometryData, VertexAttributes, MeshBuilder, split_indices
-from .properties import LODLevels
+from ..lods import LODLevels
 
 # TODO: Make ydr use this module
 

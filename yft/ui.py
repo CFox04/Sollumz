@@ -1,11 +1,10 @@
 import bpy
 from .operators import SOLLUMZ_OT_ADD_FRAG_LOD, SOLLUMZ_OT_REMOVE_FRAG_LOD
-from ..sollumz_ui import SOLLUMZ_PT_OBJECT_PANEL, SOLLUMZ_PT_VIEW_PANEL
+from ..sollumz_ui import SOLLUMZ_PT_OBJECT_PANEL
 from ..ydr.ui import SOLLUMZ_PT_BONE_PANEL
-from ..sollumz_properties import SollumType, SOLLUMZ_UI_NAMES, BOUND_TYPES
+from ..sollumz_properties import SollumType, BOUND_TYPES
 from ..sollumz_helper import find_fragment_parent
 from .properties import GroupProperties, FragmentProperties, VehicleWindowProperties
-from .operators import SOLLUMZ_OT_SET_FRAG_HIGH, SOLLUMZ_OT_SET_FRAG_MED, SOLLUMZ_OT_SET_FRAG_LOW, SOLLUMZ_OT_SET_FRAG_VLOW, SOLLUMZ_OT_SET_FRAG_HIDDEN, SOLLUMZ_OT_SET_FRAG_VERY_HIGH
 
 
 class SOLLUMZ_PT_FRAGMENT_TOOL_PANEL(bpy.types.Panel):
@@ -24,20 +23,6 @@ class SOLLUMZ_PT_FRAGMENT_TOOL_PANEL(bpy.types.Panel):
         pass
 
 
-class SOLLUMZ_UL_OBJECT_LAYERS_LIST(bpy.types.UIList):
-    bl_idname = "SOLLUMZ_UL_OBJECT_LAYERS_LIST"
-
-    def draw_item(
-        self, context, layout: bpy.types.UILayout, data, item, icon, active_data, active_propname, index
-    ):
-        col = layout.column()
-        col.scale_x = 0.35
-        col.label(text=SOLLUMZ_UI_NAMES[item.type])
-        col = layout.column()
-        col.scale_x = 0.65
-        col.prop(item, "mesh", text="")
-
-
 class SOLLUMZ_UL_PHYS_LODS_LIST(bpy.types.UIList):
     bl_idname = "SOLLUMZ_UL_PHYS_LODS_LIST"
 
@@ -54,54 +39,6 @@ class SOLLUMZ_UL_PHYS_CHILDREN_LIST(bpy.types.UIList):
         self, context, layout: bpy.types.UILayout, data, item, icon, active_data, active_propname, index
     ):
         layout.label(text=f"Child {index + 1}", icon="CON_CHILDOF")
-
-
-class SOLLUMZ_PT_LOD_LEVEL_PANEL(bpy.types.Panel):
-    bl_label = "Sollumz LODs"
-    bl_idname = "SOLLUMZ_PT_LOD_LEVEL_PANEL"
-    bl_space_type = "PROPERTIES"
-    bl_region_type = "WINDOW"
-    bl_context = "data"
-
-    @classmethod
-    def poll(cls, context):
-        active_obj = context.view_layer.objects.active
-        return active_obj is not None and active_obj.type == "MESH" and active_obj.sollum_type in [SollumType.FRAGGROUP, SollumType.FRAG_GEOM, SollumType.FRAGCHILD]
-
-    def draw(self, context):
-        layout = self.layout
-        active_obj = context.view_layer.objects.active
-        row = layout.row()
-        row.template_list(
-            SOLLUMZ_UL_OBJECT_LAYERS_LIST.bl_idname, "", active_obj.sollumz_object_lods, "lods", active_obj.sollumz_object_lods, "active_lod_index"
-        )
-
-        layout.enabled = active_obj.mode == "OBJECT"
-
-
-class SOLLUMZ_PT_LOD_VIEW_TOOLS(bpy.types.Panel):
-    bl_label = "Fragment Mesh LODs"
-    bl_idname = "SOLLUMZ_PT_LOD_VIEW_TOOLS"
-    bl_category = "Sollumz Tools"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_options = {"HIDE_HEADER"}
-    bl_parent_id = SOLLUMZ_PT_VIEW_PANEL.bl_idname
-
-    def draw(self, context):
-        layout = self.layout
-        layout.label(text="Fragment Mesh LODs")
-
-        grid = layout.grid_flow(align=True, row_major=True)
-        grid.scale_x = 0.7
-        grid.operator(SOLLUMZ_OT_SET_FRAG_VERY_HIGH.bl_idname)
-        grid.operator(SOLLUMZ_OT_SET_FRAG_HIGH.bl_idname)
-        grid.operator(SOLLUMZ_OT_SET_FRAG_MED.bl_idname)
-        grid.operator(SOLLUMZ_OT_SET_FRAG_LOW.bl_idname)
-        grid.operator(SOLLUMZ_OT_SET_FRAG_VLOW.bl_idname)
-        grid.operator(SOLLUMZ_OT_SET_FRAG_HIDDEN.bl_idname)
-
-        grid.enabled = context.view_layer.objects.active is not None and context.view_layer.objects.active.mode == "OBJECT"
 
 
 class SOLLUMZ_PT_FRAGMENT_PANEL(bpy.types.Panel):

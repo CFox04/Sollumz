@@ -7,7 +7,7 @@ from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
 
 def remove_number_suffix(string: str):
     """Remove the .00# at that Blender puts at the end of object names."""
-    match = re.search(".[0-9]", string)
+    match = re.search("\.[0-9]", string)
 
     if match is None:
         return string

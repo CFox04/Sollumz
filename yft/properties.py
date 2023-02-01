@@ -1,7 +1,6 @@
 import bpy
-from typing import Union
 
-from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType, LODLevel, items_from_enums
+from ..sollumz_properties import SOLLUMZ_UI_NAMES, SollumType
 
 
 class FragmentProperties(bpy.types.PropertyGroup):
@@ -98,84 +97,6 @@ class VehicleWindowProperties(bpy.types.PropertyGroup):
         name="Cracks Texture Tiling")
 
 
-class ObjectLODProps(bpy.types.PropertyGroup):
-    def update_object(self, context):
-        obj: bpy.types.Object = self.id_data
-
-        active_obj_lod = obj.sollumz_object_lods.active_lod
-
-        if active_obj_lod == self and self.mesh is not None:
-            obj.data = self.mesh
-            obj.hide_set(False)
-        elif self.mesh is None:
-            obj.hide_set(True)
-
-    type: bpy.props.EnumProperty(
-        items=items_from_enums(LODLevel))
-    mesh: bpy.props.PointerProperty(
-        type=bpy.types.Mesh, update=update_object)
-
-
-class LODLevels(bpy.types.PropertyGroup):
-    def get_lod(self, lod_type: str) -> Union[ObjectLODProps, None]:
-        for lod in self.lods:
-            if lod.type == lod_type:
-                return lod
-
-    def set_lod_mesh(self, lod_type: str, mesh: bpy.types.Mesh) -> Union[ObjectLODProps, None]:
-        for lod in self.lods:
-            if lod.type == lod_type:
-                lod.mesh = mesh
-                return lod
-
-    def add_lod(self, lod_type: str, mesh: Union[bpy.types.Mesh, None] = None) -> ObjectLODProps:
-        # Can't have multiple lods with the same type
-        if self.get_lod(lod_type):
-            return None
-
-        self.lods.add()
-        i = len(self.lods) - 1
-        obj_lod = self.lods[i]
-        obj_lod.type = lod_type
-
-        if mesh is not None:
-            obj_lod.mesh = mesh
-
-        return obj_lod
-
-    def remove_lod(self, lod_type: str):
-        for i, lod in enumerate(self.lods):
-            if lod.type == lod_type:
-                self.lods.remove(i)
-                return
-
-    def set_active_lod(self, lod_type: str):
-        for i, lod in enumerate(self.lods):
-            if lod.type == lod_type:
-                self.active_lod_index = i
-                return
-
-    def update_active_lod(self, context):
-        self.active_lod.update_object(context)
-
-    def add_empty_lods(self):
-        """Add all LOD lods with no meshes assigned."""
-        self.add_lod(LODLevel.VERYHIGH)
-        self.add_lod(LODLevel.HIGH)
-        self.add_lod(LODLevel.MEDIUM)
-        self.add_lod(LODLevel.LOW)
-        self.add_lod(LODLevel.VERYLOW)
-
-    @property
-    def active_lod(self) -> Union[ObjectLODProps, None]:
-        if self.active_lod_index < len(self.lods):
-            return self.lods[self.active_lod_index]
-
-    lods: bpy.props.CollectionProperty(type=ObjectLODProps)
-    active_lod_index: bpy.props.IntProperty(
-        min=0, update=update_active_lod)
-
-
 def register():
     bpy.types.Object.fragment_properties = bpy.props.PointerProperty(
         type=FragmentProperties)
@@ -208,10 +129,6 @@ def register():
         name="Type",
         default=SollumType.FRAGMENT.value
     )
-    bpy.types.Object.sollumz_object_lods = bpy.props.PointerProperty(
-        type=LODLevels)
-
-    bpy.types.Scene.sollumz_frag_is_hidden = bpy.props.BoolProperty()
 
     bpy.types.Bone.group_properties = bpy.props.PointerProperty(
         type=GroupProperties)
@@ -226,9 +143,6 @@ def unregister():
     del bpy.types.Object.is_physics_child_mesh
     del bpy.types.Object.sollumz_fragment_lods
     del bpy.types.Object.sollumz_active_frag_lod_index
-    del bpy.types.Object.sollumz_object_lods
-
-    del bpy.types.Scene.sollumz_frag_is_hidden
 
     del bpy.types.Bone.group_properties
     del bpy.types.Bone.sollumz_use_physics
