@@ -5,7 +5,7 @@ from .. import logger
 
 CollisionMaterial = namedtuple("CollisionMaterial", "name, ui_name, color, density")
 
-collision_materials = [
+collisionmats = [
 	CollisionMaterial("DEFAULT", "Default", (255,0,255,255), 1750),
 	CollisionMaterial("CONCRETE", "Concrete", (145,145,145,255), 7850.5),
 	CollisionMaterial("CONCRETE_POTHOLE", "ConcretePothole", (145,145,145,255), 4900),
